@@ -90,11 +90,11 @@ variable "volume_size" {
 }
 
 # Elasticsearch Configuration
-# variable "elasticsearch_version" {
-#   description = "Elasticsearch version to install"
-#   type        = string
-#   default     = "7.10.2"
-# }
+variable "elasticsearch_version" {
+  description = "Elasticsearch version to install"
+  type        = string
+  default     = "7.10.2"
+}
 
 variable "cluster_name" {
   description = "Elasticsearch cluster name"
@@ -102,8 +102,46 @@ variable "cluster_name" {
   default     = "elk-cluster"
 }
 
-# variable "enable_ui" {
-#   description = "Whether to enable Elasticsearch UI (Kibana)"
-#   type        = bool
-#   default     = true
-# }
+variable "enable_ui" {
+  description = "Whether to enable Elasticsearch UI (Kibana)"
+  type        = bool
+  default     = true
+}
+
+# Logstash Configuration
+variable "logstash_instance_type" {
+  description = "Type of EC2 instance for Logstash"
+  type        = string
+  default     = "t3.xlarge"
+}
+
+variable "logstash_instance_name" {
+  description = "Name of Logstash EC2 instance"
+  type        = string
+  default     = "logstash-node"
+}
+
+variable "logstash_volume_size" {
+  description = "Root volume size in GB for Logstash instance"
+  type        = number
+  default     = 50
+}
+
+# Filebeat Configuration
+variable "filebeat_instance_type" {
+  description = "Type of EC2 instance for Filebeat"
+  type        = string
+  default     = "t2.micro"
+}
+
+variable "filebeat_instance_name" {
+  description = "Name of Filebeat EC2 instance"
+  type        = string
+  default     = "filebeat-node"
+}
+
+variable "filebeat_volume_size" {
+  description = "Root volume size in GB for Filebeat instance"
+  type        = number
+  default     = 20
+}

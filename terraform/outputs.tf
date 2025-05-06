@@ -37,3 +37,43 @@ output "ssh_to_elasticsearch" {
   description = "SSH commands to connect to the Elasticsearch instances"
   value       = formatlist("ssh ubuntu@%s", aws_instance.elasticsearch[*].public_ip)
 }
+
+output "logstash_instance_id" {
+  description = "ID of the Logstash instance"
+  value       = aws_instance.logstash.id
+}
+
+output "logstash_private_ip" {
+  description = "Private IP address of the Logstash instance"
+  value       = aws_instance.logstash.private_ip
+}
+
+output "logstash_public_ip" {
+  description = "Public IP address of the Logstash instance"
+  value       = aws_instance.logstash.public_ip
+}
+
+output "ssh_to_logstash" {
+  description = "SSH command to connect to the Logstash instance"
+  value       = "ssh ubuntu@${aws_instance.logstash.public_ip}"
+}
+
+output "filebeat_instance_id" {
+  description = "ID of the Filebeat instance"
+  value       = aws_instance.filebeat.id
+}
+
+output "filebeat_private_ip" {
+  description = "Private IP address of the Filebeat instance"
+  value       = aws_instance.filebeat.private_ip
+}
+
+output "filebeat_public_ip" {
+  description = "Public IP address of the Filebeat instance"
+  value       = aws_instance.filebeat.public_ip
+}
+
+output "ssh_to_filebeat" {
+  description = "SSH command to connect to the Filebeat instance"
+  value       = "ssh ubuntu@${aws_instance.filebeat.public_ip}"
+}

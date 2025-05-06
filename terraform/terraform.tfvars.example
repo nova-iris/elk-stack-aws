@@ -23,5 +23,15 @@ elasticsearch_version = "7.10.2"
 cluster_name         = "elk-cluster"
 enable_ui            = true  # Set to true to install Kibana alongside Elasticsearch
 
+# Logstash Configuration
+logstash_instance_name = "logstash-node"
+logstash_instance_type = "t3.xlarge"  # Default instance type for Logstash
+logstash_volume_size   = 50  # Volume size in GB for Logstash instance
+
+# Filebeat Configuration
+filebeat_instance_name = "filebeat-node"
+filebeat_instance_type = "t2.micro"  # Default instance type for Filebeat
+filebeat_volume_size   = 20  # Volume size in GB for Filebeat instance
+
 # Environment
 environment = "dev"
