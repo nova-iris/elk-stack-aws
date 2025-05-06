@@ -117,10 +117,99 @@
   systemd:
     name: elasticsearch.service
     enabled: yes
+  when: "'elasticsearch_master' in group_names"
   tags: elasticsearch
 
 - name: Start Elasticsearch service
   systemd:
     name: elasticsearch.service
     state: started
+  when: "'elasticsearch_master' in group_names"
   tags: elasticsearch
+
+# Enrollment token handling - Master node
+- name: Generate node enrollment token on master node
+  shell: /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s node
+  register: enrollment_token
+  when: 
+    - "'elasticsearch_master' in group_names"
+    - elasticsearch_version_major | int >= 8
+  tags:
+    - elasticsearch
+    - elasticsearch:enrollment
+
+- name: Print enrollment token
+  debug:
+    msg: "Enrollment token: {{ enrollment_token.stdout }}"
+  when: 
+    - "'elasticsearch_master' in group_names"
+    - elasticsearch_version_major | int >= 8
+    - enrollment_token is defined
+  tags:
+    - elasticsearch
+    - elasticsearch:enrollment
+
+# Register the token as a fact so it can be used by other hosts
+- name: Set enrollment token as a fact
+  set_fact:
+    node_enrollment_token: "{{ enrollment_token.stdout }}"
+  when: 
+    - enrollment_token is defined
+    - enrollment_token.stdout is defined
+  tags:
+    - elasticsearch
+    - elasticsearch:enrollment
+
+# Share the token with all hosts in the play
+- name: Share enrollment token with all hosts
+  set_fact:
+    node_enrollment_token: "{{ hostvars[groups['elasticsearch_master'][0]]['node_enrollment_token'] }}"
+  when:
+    - "'elasticsearch_master' in groups"
+    - groups['elasticsearch_master'] | length > 0
+    - hostvars[groups['elasticsearch_master'][0]]['node_enrollment_token'] is defined
+  tags:
+    - elasticsearch
+    - elasticsearch:enrollment
+
+# Create a temporary token file on data nodes
+- name: Create token file on data nodes
+  copy:
+    content: "{{ node_enrollment_token }}"
+    dest: "/tmp/es_enrollment_token.txt"
+    mode: '0600'
+    owner: elasticsearch
+    group: elasticsearch
+  when: 
+    - "'elasticsearch_data' in group_names"
+    - "'elasticsearch_master' not in group_names"
+    - elasticsearch_version_major | int >= 8
+    - node_enrollment_token is defined
+  tags:
+    - elasticsearch
+    - elasticsearch:enrollment
+
+# Enroll data nodes to the cluster
+- name: Register data nodes to elasticsearch cluster
+  shell: |
+    echo "y" | /usr/share/elasticsearch/bin/elasticsearch-reconfigure-node --enrollment-token $(cat /tmp/es_enrollment_token.txt)
+  register: enrollment_result
+  when:
+    - "'elasticsearch_data' in group_names"
+    - "'elasticsearch_master' not in group_names"
+    - elasticsearch_version_major | int >= 8
+    - node_enrollment_token is defined
+  failed_when: enrollment_result.rc != 0 and "Node is already enrolled in a cluster" not in enrollment_result.stderr
+  tags:
+    - elasticsearch
+    - elasticsearch:enrollment
+
+# Clean up enrollment token files
+- name: Remove enrollment token files
+  file:
+    path: "/tmp/es_enrollment_token.txt"
+    state: absent
+  when: node_enrollment_token is defined
+  tags:
+    - elasticsearch
+    - elasticsearch:enrollment
