@@ -1,0 +1,27 @@
+# AWS Configuration
+aws_region = "us-east-1"
+access_key = "<YOUR_ACCESS_KEY>"
+secret_key = "<YOUR_SECRET_KEY>"
+
+# VPC Configuration
+create_vpc = true  # Set to false to use existing VPC
+vpc_cidr   = "10.0.0.0/16"
+# vpc_id    = "<EXISTING_VPC_ID>"  # Uncomment if create_vpc = false
+# existing_public_subnets  = ["<SUBNET_ID_1>", "<SUBNET_ID_2>"]  # Uncomment if create_vpc = false
+# existing_private_subnets = ["<SUBNET_ID_1>", "<SUBNET_ID_2>"]  # Uncomment if create_vpc = false
+
+# EC2 Configuration
+instance_name             = "elasticsearch-node"
+instance_type             = "t3.2xlarge"  # Recommended for Elasticsearch
+instance_count            = 3  # Number of nodes in the Elasticsearch cluster
+associate_public_ip_address = true
+public_key                = "<PATH_TO_PUBLIC_KEY>"  # Optional: SSH key path
+volume_size               = 100  # Recommended at least 100GB for Elasticsearch
+
+# Elasticsearch Configuration
+elasticsearch_version = "7.10.2"
+cluster_name         = "elk-cluster"
+enable_ui            = true  # Set to true to install Kibana alongside Elasticsearch
+
+# Environment
+environment = "dev"
