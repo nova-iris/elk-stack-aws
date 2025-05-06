@@ -1,0 +1,50 @@
+# Ansible inventory generated from Terraform outputs
+# Generated on: ${timestamp()}
+
+[elasticsearch_master]
+%{ for index, instance in elasticsearch_instances ~}
+%{ if index == 0 ~}
+${instance.public_ip} elasticsearch_node_role=master ansible_user=ubuntu
+%{ endif ~}
+%{ endfor ~}
+
+[elasticsearch_data]
+%{ for index, instance in elasticsearch_instances ~}
+${instance.public_ip} elasticsearch_node_role=data ansible_user=ubuntu
+%{ endfor ~}
+
+[logstash]
+${logstash_instance.public_ip} ansible_user=ubuntu
+
+[filebeat]
+${filebeat_instance.public_ip} ansible_user=ubuntu
+
+[elasticsearch:children]
+elasticsearch_master
+elasticsearch_data
+
+[elk:children]
+elasticsearch
+logstash
+filebeat
+
+[elasticsearch:vars]
+ansible_ssh_private_key_file=~/.ssh/id_ed25519
+ansible_python_interpreter=/usr/bin/python3
+elasticsearch_cluster_name=${cluster_name}
+elasticsearch_version=${elasticsearch_version}
+enable_kibana=${enable_ui ? "true" : "false"}
+
+[logstash:vars]
+ansible_ssh_private_key_file=~/.ssh/id_ed25519
+ansible_python_interpreter=/usr/bin/python3
+%{ for index, instance in elasticsearch_instances ~}
+%{ if index == 0 ~}
+elasticsearch_host=${instance.private_ip}
+%{ endif ~}
+%{ endfor ~}
+
+[filebeat:vars]
+ansible_ssh_private_key_file=~/.ssh/id_ed25519
+ansible_python_interpreter=/usr/bin/python3
+logstash_host=${logstash_instance.private_ip}
