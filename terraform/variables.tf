@@ -99,7 +99,7 @@ variable "elasticsearch_version" {
 variable "cluster_name" {
   description = "Elasticsearch cluster name"
   type        = string
-  default     = "elk-cluster"
+  default     = "es-poc"
 }
 
 variable "enable_ui" {

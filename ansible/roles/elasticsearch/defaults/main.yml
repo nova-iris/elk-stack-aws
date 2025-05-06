@@ -1,38 +1,32 @@
 ---
 # Default variables for Elasticsearch role
 
-# Elasticsearch version settings
-elasticsearch_version: "8.19"
+# Version settings
+elasticsearch_version: "latest"
 elasticsearch_version_major: "8"
+
+# Network settings
+elasticsearch_bind_host: "0.0.0.0"
+elasticsearch_http_port: 9200
 
 # Cluster settings
 elasticsearch_cluster_name: "es-poc"
 elasticsearch_node_name: "{{ inventory_hostname }}"
-elasticsearch_initial_master_nodes: []
+elasticsearch_node_roles: ["master", "data", "ingest"]
 
-# Node join configuration
-elasticsearch_join_master: false
-elasticsearch_master_host: "{{ groups['elasticsearch_master'][0] if groups['elasticsearch_master'] is defined and groups['elasticsearch_master'] | length > 0 else '' }}"
-elasticsearch_enrollment_token: ""
+# Path settings
+elasticsearch_data_path: "/mnt/data/elasticsearch"
+elasticsearch_logs_path: "/var/log/elasticsearch"
 
-# System settings
-elasticsearch_data_dir: "/mnt/data/elasticsearch"
-elasticsearch_log_dir: "/var/log/elasticsearch"
-elasticsearch_pid_dir: "/var/run/elasticsearch"
-
-# Network settings
-elasticsearch_http_port: 9200
-elasticsearch_transport_port: 9300
-elasticsearch_network_host: "0.0.0.0"
-elasticsearch_discovery_seed_hosts: []
-
-# Memory settings
+# JVM settings
 elasticsearch_heap_size: "1g"
 
-# Security settings
-elasticsearch_xpack_security_enabled: true
-elasticsearch_xpack_security_transport_ssl_enabled: true
-elasticsearch_xpack_security_http_ssl_enabled: true
+# Discovery settings for multi-node clusters
+elasticsearch_discovery_seed_hosts: ["127.0.0.1"]
+elasticsearch_initial_master_nodes: ["{{ inventory_hostname }}"]
 
-# Plugin settings
-elasticsearch_plugins: []
+# Security settings
+elasticsearch_security_enabled: true
+
+# System settings
+elasticsearch_bootstrap_memory_lock: false

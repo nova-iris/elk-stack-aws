@@ -6,75 +6,74 @@
 # https://www.elastic.co/guide/en/elasticsearch/reference/current/settings.html
 
 # ---------------------------------- Cluster -----------------------------------
-cluster.name: {{ elasticsearch_cluster_name }}
+# Use a descriptive name for your cluster:
+cluster.name: es-poc
 
 # ------------------------------------ Node ------------------------------------
+# Use a descriptive name for the node:
 node.name: {{ elasticsearch_node_name }}
-node.roles: [ {{ elasticsearch_node_role }} ]
+
+{% if elasticsearch_node_roles is defined and elasticsearch_node_roles | length > 0 %}
+# Set specific node roles
+node.roles: [ {{ elasticsearch_node_roles | join(',') }} ]
+{% endif %}
 
 # ----------------------------------- Paths ------------------------------------
-path.data: {{ elasticsearch_data_dir }}
-path.logs: {{ elasticsearch_log_dir }}
+# Path to directory where to store the data (separate multiple paths with comma):
+path.data: /mnt/data/elasticsearch
+
+# Path to log files:
+path.logs: {{ elasticsearch_logs_path }}
 
 # ---------------------------------- Network -----------------------------------
-network.host: {{ elasticsearch_network_host }}
+# Set the bind address to a specific IP (IPv4 or IPv6):
+network.host: 0.0.0.0
+
+# Set a custom port for HTTP:
 http.port: {{ elasticsearch_http_port }}
+
+{% if elasticsearch_transport_port is defined %}
+# Set a custom port for node-to-node communication:
 transport.port: {{ elasticsearch_transport_port }}
+{% endif %}
 
 # --------------------------------- Discovery ----------------------------------
-{% if elasticsearch_node_role == 'master' %}
-# Master node discovery settings
-{% if elasticsearch_discovery_seed_hosts | length > 0 %}
-{{ elasticsearch_discovery_seed_hosts_setting }}: [{% for host in elasticsearch_discovery_seed_hosts %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{% if elasticsearch_discovery_seed_hosts is defined and elasticsearch_discovery_seed_hosts | length > 0 %}
+# Pass an initial list of hosts to perform discovery when this node is started:
+discovery.seed_hosts: [{% for host in elasticsearch_discovery_seed_hosts %}"{{ host }}"{% if not loop.last %},{% endif %}{% endfor %}]
 {% endif %}
 
-{% if elasticsearch_initial_master_nodes | length > 0 %}
-{{ elasticsearch_initial_master_nodes_setting }}: [{% for node in elasticsearch_initial_master_nodes %}"{{ node }}"{% if not loop.last %}, {% endif %}{% endfor %}]
-{% endif %}
-{% else %}
-# Data node discovery settings - will join the cluster via enrollment token
-{{ elasticsearch_discovery_seed_hosts_setting }}: ["{{ elasticsearch_master_host }}"]
+{% if elasticsearch_initial_master_nodes is defined and elasticsearch_initial_master_nodes | length > 0 %}
+# Bootstrap the cluster using an initial set of master-eligible nodes:
+cluster.initial_master_nodes: [{% for node in elasticsearch_initial_master_nodes %}"{{ node }}"{% if not loop.last %},{% endif %}{% endfor %}]
 {% endif %}
 
-# ---------------------------------- Security ---------------------------------
-# Security settings
-xpack.security.enabled: {{ elasticsearch_xpack_security_enabled | lower }}
-xpack.security.enrollment.enabled: {{ elasticsearch_xpack_security_enrollment_enabled | default(true) | lower }}
-
-{% if elasticsearch_auto_generate_certs | default(true) %}
-# Auto-generate and use self-signed certificates 
-xpack.security.transport.ssl.enabled: {{ elasticsearch_xpack_security_transport_ssl_enabled | lower }}
-xpack.security.transport.ssl.keystore.path: /etc/elasticsearch/certs/transport.p12
-xpack.security.transport.ssl.truststore.path: /etc/elasticsearch/certs/transport.p12
-
-# HTTP SSL configuration
-xpack.security.http.ssl.enabled: {{ elasticsearch_xpack_security_http_ssl_enabled | lower }}
-xpack.security.http.ssl.keystore.path: /etc/elasticsearch/certs/http.p12
-{% else %}
-# SSL settings with explicit configuration 
-xpack.security.transport.ssl.enabled: {{ elasticsearch_xpack_security_transport_ssl_enabled | lower }}
-{% if elasticsearch_xpack_security_transport_ssl_enabled %}
-xpack.security.transport.ssl.verification_mode: certificate
-xpack.security.transport.ssl.client_authentication: required
-{% if elasticsearch_transport_keystore_path is defined %}
-xpack.security.transport.ssl.keystore.path: {{ elasticsearch_transport_keystore_path }}
-{% if elasticsearch_transport_keystore_password is defined %}
-xpack.security.transport.ssl.keystore.password: {{ elasticsearch_transport_keystore_password }}
+# ---------------------------------- Various -----------------------------------
+{% if elasticsearch_bootstrap_memory_lock %}
+# Lock the memory on startup:
+bootstrap.memory_lock: true
 {% endif %}
+
+# ---------------------------------- Security ----------------------------------
+{% if elasticsearch_security_enabled %}
+# Enable security:
+xpack.security.enabled: true
+{% if elasticsearch_ssl_enabled %}
+# Enable encryption for HTTP API:
+xpack.security.http.ssl.enabled: true
+{% endif %}
+# Enable encryption for transport layer:
+xpack.security.transport.ssl.enabled: {{ elasticsearch_ssl_enabled | lower }}
+{% if elasticsearch_auto_configuration %}
+# Allow auto configuration of TLS:
+xpack.security.autoconfiguration.enabled: true
 {% endif %}
 {% endif %}
 
-# HTTP SSL configuration with explicit configuration
-xpack.security.http.ssl.enabled: {{ elasticsearch_xpack_security_http_ssl_enabled | lower }}
-{% if elasticsearch_xpack_security_http_ssl_enabled %}
-{% if elasticsearch_http_keystore_path is defined %}
-xpack.security.http.ssl.keystore.path: {{ elasticsearch_http_keystore_path }}
-{% if elasticsearch_http_keystore_password is defined %}
-xpack.security.http.ssl.keystore.password: {{ elasticsearch_http_keystore_password }}
+# ---------------------------------- Custom -----------------------------------
+# Add any custom settings below:
+{% if elasticsearch_custom_settings is defined %}
+{% for key, value in elasticsearch_custom_settings.items() %}
+{{ key }}: {{ value }}
+{% endfor %}
 {% endif %}
-{% endif %}
-{% endif %}
-{% endif %}
-
-# ---------------------------------- Various ----------------------------------
-action.destructive_requires_name: true

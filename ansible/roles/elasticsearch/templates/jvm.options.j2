@@ -1,31 +1,7 @@
-## JVM configuration
-# This file is managed by Ansible
+## JVM configuration - Managed by Ansible
 
-################################################################
-## IMPORTANT: JVM heap size
-################################################################
+# Xms represents the initial size of total heap space
+# Xmx represents the maximum size of total heap space
+
 -Xms{{ elasticsearch_heap_size }}
 -Xmx{{ elasticsearch_heap_size }}
-
-################################################################
-## Expert settings
-################################################################
-## GC configuration
--XX:+UseG1GC
--XX:G1ReservePercent=25
--XX:InitiatingHeapOccupancyPercent=30
-
-## JVM temporary directory
--Djava.io.tmpdir=${ES_TMPDIR}
-
-## heap dumps
-
-# generate a heap dump when an allocation from the Java heap fails
--XX:+HeapDumpOnOutOfMemoryError
-
-# specify an alternative path for heap dumps; ensure the directory exists and
-# has sufficient space
--XX:HeapDumpPath=/var/lib/elasticsearch
-
-# specify an alternative path for JVM fatal error logs
--XX:ErrorFile=/var/log/elasticsearch/hs_err_pid%p.log
