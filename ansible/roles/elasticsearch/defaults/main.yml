@@ -1,0 +1,38 @@
+---
+# Default variables for Elasticsearch role
+
+# Elasticsearch version settings
+elasticsearch_version: "8.19"
+elasticsearch_version_major: "8"
+
+# Cluster settings
+elasticsearch_cluster_name: "es-poc"
+elasticsearch_node_name: "{{ inventory_hostname }}"
+elasticsearch_initial_master_nodes: []
+
+# Node join configuration
+elasticsearch_join_master: false
+elasticsearch_master_host: "{{ groups['elasticsearch_master'][0] if groups['elasticsearch_master'] is defined and groups['elasticsearch_master'] | length > 0 else '' }}"
+elasticsearch_enrollment_token: ""
+
+# System settings
+elasticsearch_data_dir: "/mnt/data/elasticsearch"
+elasticsearch_log_dir: "/var/log/elasticsearch"
+elasticsearch_pid_dir: "/var/run/elasticsearch"
+
+# Network settings
+elasticsearch_http_port: 9200
+elasticsearch_transport_port: 9300
+elasticsearch_network_host: "0.0.0.0"
+elasticsearch_discovery_seed_hosts: []
+
+# Memory settings
+elasticsearch_heap_size: "1g"
+
+# Security settings
+elasticsearch_xpack_security_enabled: true
+elasticsearch_xpack_security_transport_ssl_enabled: true
+elasticsearch_xpack_security_http_ssl_enabled: true
+
+# Plugin settings
+elasticsearch_plugins: []

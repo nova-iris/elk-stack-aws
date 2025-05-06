@@ -1,0 +1,80 @@
+# ======================== Elasticsearch Configuration =========================
+#
+# This file is managed by Ansible. Manual changes will be overwritten.
+#
+# Please consult the documentation for further information on configuration options:
+# https://www.elastic.co/guide/en/elasticsearch/reference/current/settings.html
+
+# ---------------------------------- Cluster -----------------------------------
+cluster.name: {{ elasticsearch_cluster_name }}
+
+# ------------------------------------ Node ------------------------------------
+node.name: {{ elasticsearch_node_name }}
+node.roles: [ {{ elasticsearch_node_role }} ]
+
+# ----------------------------------- Paths ------------------------------------
+path.data: {{ elasticsearch_data_dir }}
+path.logs: {{ elasticsearch_log_dir }}
+
+# ---------------------------------- Network -----------------------------------
+network.host: {{ elasticsearch_network_host }}
+http.port: {{ elasticsearch_http_port }}
+transport.port: {{ elasticsearch_transport_port }}
+
+# --------------------------------- Discovery ----------------------------------
+{% if elasticsearch_node_role == 'master' %}
+# Master node discovery settings
+{% if elasticsearch_discovery_seed_hosts | length > 0 %}
+{{ elasticsearch_discovery_seed_hosts_setting }}: [{% for host in elasticsearch_discovery_seed_hosts %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{% endif %}
+
+{% if elasticsearch_initial_master_nodes | length > 0 %}
+{{ elasticsearch_initial_master_nodes_setting }}: [{% for node in elasticsearch_initial_master_nodes %}"{{ node }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{% endif %}
+{% else %}
+# Data node discovery settings - will join the cluster via enrollment token
+{{ elasticsearch_discovery_seed_hosts_setting }}: ["{{ elasticsearch_master_host }}"]
+{% endif %}
+
+# ---------------------------------- Security ---------------------------------
+# Security settings
+xpack.security.enabled: {{ elasticsearch_xpack_security_enabled | lower }}
+xpack.security.enrollment.enabled: {{ elasticsearch_xpack_security_enrollment_enabled | default(true) | lower }}
+
+{% if elasticsearch_auto_generate_certs | default(true) %}
+# Auto-generate and use self-signed certificates 
+xpack.security.transport.ssl.enabled: {{ elasticsearch_xpack_security_transport_ssl_enabled | lower }}
+xpack.security.transport.ssl.keystore.path: /etc/elasticsearch/certs/transport.p12
+xpack.security.transport.ssl.truststore.path: /etc/elasticsearch/certs/transport.p12
+
+# HTTP SSL configuration
+xpack.security.http.ssl.enabled: {{ elasticsearch_xpack_security_http_ssl_enabled | lower }}
+xpack.security.http.ssl.keystore.path: /etc/elasticsearch/certs/http.p12
+{% else %}
+# SSL settings with explicit configuration 
+xpack.security.transport.ssl.enabled: {{ elasticsearch_xpack_security_transport_ssl_enabled | lower }}
+{% if elasticsearch_xpack_security_transport_ssl_enabled %}
+xpack.security.transport.ssl.verification_mode: certificate
+xpack.security.transport.ssl.client_authentication: required
+{% if elasticsearch_transport_keystore_path is defined %}
+xpack.security.transport.ssl.keystore.path: {{ elasticsearch_transport_keystore_path }}
+{% if elasticsearch_transport_keystore_password is defined %}
+xpack.security.transport.ssl.keystore.password: {{ elasticsearch_transport_keystore_password }}
+{% endif %}
+{% endif %}
+{% endif %}
+
+# HTTP SSL configuration with explicit configuration
+xpack.security.http.ssl.enabled: {{ elasticsearch_xpack_security_http_ssl_enabled | lower }}
+{% if elasticsearch_xpack_security_http_ssl_enabled %}
+{% if elasticsearch_http_keystore_path is defined %}
+xpack.security.http.ssl.keystore.path: {{ elasticsearch_http_keystore_path }}
+{% if elasticsearch_http_keystore_password is defined %}
+xpack.security.http.ssl.keystore.password: {{ elasticsearch_http_keystore_password }}
+{% endif %}
+{% endif %}
+{% endif %}
+{% endif %}
+
+# ---------------------------------- Various ----------------------------------
+action.destructive_requires_name: true

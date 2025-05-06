@@ -7,19 +7,19 @@ variable "aws_region" {
 // AWS credentials removed - using provider from root module
 
 variable "vpc_id" {
-  description = "VPC ID from vpc-vault module"
+  description = "VPC ID where EC2 instance will be deployed"
   type        = string
 }
 
 variable "subnet_id" {
-  description = "Subnet ID from vpc-vault module"
+  description = "Subnet ID where EC2 instance will be deployed"
   type        = string
 }
 
 variable "instance_name" {
   description = "Name of the EC2 instance"
   type        = string
-  default     = "vault-server"
+  default     = "ec2-instance"
 }
 
 variable "instance_type" {
@@ -32,6 +32,12 @@ variable "instance_state" {
   description = "EC2 instance state after provisioning"
   type        = string
   default     = "running"
+}
+
+variable "ami_id" {
+  description = "AMI ID to use for the instance. If not provided, latest Ubuntu 24.04 will be used."
+  type        = string
+  default     = ""
 }
 
 variable "public_key" {
@@ -61,7 +67,7 @@ variable "volume_size" {
 variable "security_group_name" {
   description = "Name for the security group"
   type        = string
-  default     = "vault-sg"
+  default     = "ec2-sg"
 }
 
 variable "user_data" {
@@ -70,14 +76,56 @@ variable "user_data" {
   default     = ""
 }
 
-variable "public_subnet_ids" {
-  description = "List of public subnet IDs for the ALB"
-  type        = list(string)
-  default     = []
+variable "additional_tags" {
+  description = "Additional tags to add to the instance and security group"
+  type        = map(string)
+  default     = {}
 }
 
-variable "create_alb" {
-  description = "Whether to create an ALB for Vault"
+variable "custom_ingress_rules" {
+  description = "List of custom ingress rules for the security group in addition to SSH, HTTP, and HTTPS"
+  type = list(object({
+    from_port   = number
+    to_port     = number
+    protocol    = string
+    cidr_blocks = list(string)
+    description = string
+  }))
+  default = []
+}
+
+variable "enable_default_ingress_rules" {
+  description = "Whether to enable default ingress rules (SSH, HTTP, HTTPS)"
+  type        = bool
+  default     = true
+}
+
+variable "root_volume_type" {
+  description = "Type of the root volume (gp2, gp3, io1, io2, etc.)"
+  type        = string
+  default     = "gp2"
+}
+
+variable "delete_on_termination" {
+  description = "Whether to delete the root volume on instance termination"
   type        = bool
   default     = false
+}
+
+variable "instance_count" {
+  description = "Number of instances to create"
+  type        = number
+  default     = 1
+}
+
+variable "use_num_suffix" {
+  description = "Whether to append a numerical suffix to instance names when creating multiple instances"
+  type        = bool
+  default     = true
+}
+
+variable "iam_instance_profile" {
+  description = "IAM Instance Profile to use for the instance"
+  type        = string
+  default     = null
 }

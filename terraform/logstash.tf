@@ -1,117 +1,88 @@
-# Security Group for Logstash
-resource "aws_security_group" "logstash_sg" {
-  name        = "logstash-sg"
-  description = "Security group for Logstash"
-  vpc_id      = module.vpc.vpc_id
+# Logstash instance using the enhanced EC2 module
+module "logstash" {
+  source = "./modules/ec2"
 
-  # Beats input
-  ingress {
-    from_port   = 5044
-    to_port     = 5044
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Logstash Beats input"
-  }
-
-  # TCP input
-  ingress {
-    from_port   = 5000
-    to_port     = 5000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Logstash TCP input"
-  }
-
-  # UDP input
-  ingress {
-    from_port   = 5000
-    to_port     = 5000
-    protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Logstash UDP input"
-  }
-
-  # Syslog TCP
-  ingress {
-    from_port   = 514
-    to_port     = 514
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Syslog TCP"
-  }
-
-  # Syslog UDP
-  ingress {
-    from_port   = 514
-    to_port     = 514
-    protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Syslog UDP"
-  }
-
-  # HTTP input
-  ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Logstash HTTP input"
-  }
-
-  # SSH
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "SSH"
-  }
-
-  # ICMP
-  ingress {
-    from_port   = -1
-    to_port     = -1
-    protocol    = "icmp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "ICMP"
-  }
-
-  # All outbound traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "All outbound traffic"
-  }
-
-  tags = {
-    Name        = "logstash-sg"
-    Environment = var.environment
-  }
-}
-
-# EC2 Logstash Instance
-resource "aws_instance" "logstash" {
-  ami           = data.aws_ami.ubuntu.id
-  instance_type = var.logstash_instance_type
-  subnet_id     = var.create_vpc ? module.vpc.public_subnets[0] : var.existing_public_subnets[0]
-
-  vpc_security_group_ids      = [aws_security_group.logstash_sg.id, aws_security_group.elasticsearch_sg.id]
+  # VPC/Network Configuration
+  vpc_id                      = module.vpc.vpc_id
+  subnet_id                   = var.create_vpc ? module.vpc.public_subnets[0] : var.existing_public_subnets[0]
   associate_public_ip_address = var.associate_public_ip_address
-  key_name                    = aws_key_pair.elasticsearch_key[0].key_name
 
-  root_block_device {
-    volume_size = var.logstash_volume_size
-    volume_type = "gp3"
-    encrypted   = true
-  }
+  # Instance Configuration
+  instance_name         = var.logstash_instance_name
+  instance_type         = var.logstash_instance_type
+  volume_size           = var.logstash_volume_size
+  root_volume_type      = "gp3"
+  delete_on_termination = false
+  public_key            = var.public_key
 
-  tags = {
-    Name           = var.logstash_instance_name
-    Environment    = var.environment
+  # Security Configuration - Custom ports for Logstash
+  security_group_name          = "logstash-sg-${var.environment}"
+  enable_default_ingress_rules = true # Enable SSH/HTTP/HTTPS
+
+  # Add custom rules for Logstash
+  custom_ingress_rules = [
+    {
+      from_port   = 5044
+      to_port     = 5044
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Logstash Beats input"
+    },
+    {
+      from_port   = 5000
+      to_port     = 5000
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Logstash TCP input"
+    },
+    {
+      from_port   = 5000
+      to_port     = 5000
+      protocol    = "udp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Logstash UDP input"
+    },
+    {
+      from_port   = 514
+      to_port     = 514
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Syslog TCP"
+    },
+    {
+      from_port   = 514
+      to_port     = 514
+      protocol    = "udp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Syslog UDP"
+    },
+    {
+      from_port   = 8080
+      to_port     = 8080
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Logstash HTTP input"
+    },
+    {
+      from_port   = -1
+      to_port     = -1
+      protocol    = "icmp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "ICMP"
+    }
+  ]
+
+  # Tags
+  additional_tags = {
     ClusterName    = var.cluster_name
     Role           = "logstash"
     AnsibleManaged = "true"
   }
+  environment = var.environment
+
+  # User data script for Logstash installation and configuration
+  #   user_data = templatefile("${path.module}/scripts/logstash.sh.tftpl", {
+  #     elasticsearch_host = module.elasticsearch.private_ips[0]
+  #     environment        = var.environment
+  #   })
 }

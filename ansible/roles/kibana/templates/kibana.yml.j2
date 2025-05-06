@@ -1,0 +1,21 @@
+# ======================== Kibana Configuration =========================
+#
+# This file is managed by Ansible. Manual changes will be overwritten.
+#
+# Please consult the documentation for further information on configuration options:
+# https://www.elastic.co/guide/en/kibana/current/settings.html
+
+# ---------------------------------- Server ------------------------------------
+server.host: "{{ kibana_host }}"
+server.port: {{ kibana_port }}
+
+# ---------------------------------- Elasticsearch ----------------------------
+{% if not kibana_use_enrollment_token %}
+elasticsearch.hosts: [{% for host in kibana_elasticsearch_hosts %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+elasticsearch.username: "{{ kibana_elasticsearch_username }}"
+elasticsearch.password: "{{ kibana_elasticsearch_password | default('') }}"
+elasticsearch.ssl.verificationMode: "{{ kibana_elasticsearch_ssl_verification_mode }}"
+{% endif %}
+
+# ---------------------------------- Logging ----------------------------------
+logging.root.level: info

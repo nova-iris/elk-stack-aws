@@ -1,0 +1,25 @@
+---
+# Default variables for Kibana role
+
+# Kibana version settings
+kibana_version: "latest"
+kibana_version_major: "8"
+
+# Network settings
+kibana_host: "0.0.0.0"
+kibana_port: 5601
+
+# Elasticsearch connection
+kibana_elasticsearch_hosts: ["https://localhost:9200"]
+
+# Security settings
+kibana_elasticsearch_username: "kibana_system"
+kibana_elasticsearch_ssl_verification_mode: "certificate"
+
+# Enrollment settings
+kibana_use_enrollment_token: true
+
+# Automation settings
+kibana_automation: true
+kibana_api_key_expiration: "30d"
+kibana_api_key_name: "logstash_writer"

@@ -1,0 +1,102 @@
+---
+# Main playbook for installing ELK Stack
+
+# Install master nodes first
+- name: Install and configure Elasticsearch master nodes
+  hosts: elasticsearch_master
+  become: yes
+  roles:
+    - elasticsearch
+    - kibana
+  tags:
+    - elasticsearch
+    - master
+    - kibana
+
+# Then install data nodes
+- name: Install and configure Elasticsearch data nodes
+  hosts: elasticsearch_data:!elasticsearch_master
+  become: yes
+  roles:
+    - elasticsearch
+  tags:
+    - elasticsearch
+    - data
+  vars:
+    elasticsearch_join_master: true
+
+# Logstash installation will be added in future updates
+- name: Install and configure Logstash
+  hosts: logstash
+  become: yes
+  tasks:
+    - name: Placeholder for Logstash installation
+      debug:
+        msg: "Logstash installation steps will be added in the next iteration"
+  tags:
+    - logstash
+
+# Filebeat installation will be added in future updates
+- name: Install and configure Filebeat
+  hosts: filebeat
+  become: yes
+  tasks:
+    - name: Placeholder for Filebeat installation
+      debug:
+        msg: "Filebeat installation steps will be added in the next iteration"
+  tags:
+    - filebeat
+
+# Collect and display final credentials summary
+- name: Collect and display credentials summary
+  hosts: elasticsearch_master
+  become: yes
+  tasks:
+    - name: Fetch elastic user password with more robust pattern
+      shell: >
+        grep -A 20 "Security autoconfiguration information" /var/log/elasticsearch/elasticsearch*.log | 
+        grep -m 1 -E "(elastic built-in superuser|password for the elastic user) is.*" |
+        grep -oE "[a-zA-Z0-9]{8,}" ||
+        echo "Password not found in logs"
+      register: final_elastic_password
+      ignore_errors: yes
+      tags: summary
+
+    - name: Check if credentials file exists
+      stat:
+        path: "/etc/elasticsearch/elastic_credentials.txt"
+      register: cred_file
+      tags: summary
+      
+    - name: Read credentials from file if exists
+      shell: >
+        grep -A 1 "Password:" /etc/elasticsearch/elastic_credentials.txt | 
+        tail -1 | 
+        awk '{print $2}'
+      register: file_password
+      when: cred_file.stat.exists
+      ignore_errors: yes
+      tags: summary
+      
+    - name: Set final password from best available source
+      set_fact:
+        elastic_final_password: "{{ file_password.stdout if (cred_file.stat.exists and file_password.stdout != '') else 
+                              (final_elastic_password.stdout if final_elastic_password.stdout != 'Password not found in logs' else 'Password not found') }}"
+      tags: summary
+
+    - name: Display Elasticsearch and Kibana login credentials
+      debug:
+        msg: |
+          ===========================================================
+          ELASTICSEARCH & KIBANA LOGIN CREDENTIALS
+          ===========================================================
+          Username: elastic
+          Password: {{ elastic_final_password }}
+          
+          You can access Kibana at: https://{{ ansible_host }}:5601
+          You can access Elasticsearch at: https://{{ ansible_host }}:9200
+          
+          To retrieve credentials at any time, log into the master node
+          and run: sudo /usr/local/bin/get_elastic_credentials.sh
+          ===========================================================
+      tags: summary

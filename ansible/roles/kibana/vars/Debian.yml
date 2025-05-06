@@ -1,0 +1,8 @@
+---
+# Debian/Ubuntu specific variables for Kibana
+
+kibana_user: kibana
+kibana_group: kibana
+kibana_package_name: kibana
+kibana_service_name: kibana
+kibana_conf_dir: /etc/kibana

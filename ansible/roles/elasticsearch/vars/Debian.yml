@@ -1,0 +1,10 @@
+---
+# Debian/Ubuntu specific variables for Elasticsearch
+
+elasticsearch_user: elasticsearch
+elasticsearch_group: elasticsearch
+elasticsearch_package_name: elasticsearch
+elasticsearch_service_name: elasticsearch
+elasticsearch_conf_dir: /etc/elasticsearch
+elasticsearch_pid_file: /var/run/elasticsearch/elasticsearch.pid
+elasticsearch_default_file: /etc/default/elasticsearch

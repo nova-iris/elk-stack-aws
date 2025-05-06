@@ -1,0 +1,419 @@
+---
+# Main tasks for Elasticsearch role
+
+# Include OS-specific variables
+- name: Include OS-specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
+  tags: elasticsearch
+
+# Include version-specific variable overrides
+- name: Include version-specific variables
+  include_vars: "{{ elasticsearch_version_major }}.yml"
+  when: elasticsearch_version_major is defined
+  ignore_errors: yes
+  tags: elasticsearch
+
+# VM preparation tasks
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  tags: elasticsearch
+
+- name: Install apt-transport-https
+  apt:
+    name: apt-transport-https
+    state: present
+  tags: elasticsearch
+
+# Elasticsearch installation
+- name: Download Elasticsearch GPG key
+  shell: >
+    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | 
+    sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/elasticsearch-keyring.gpg
+  tags: elasticsearch
+
+- name: Add Elasticsearch repository
+  shell: >
+    echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] 
+    https://artifacts.elastic.co/packages/{{ elasticsearch_version_major }}.x/apt stable main" | 
+    sudo tee /etc/apt/sources.list.d/elastic-{{ elasticsearch_version_major }}.x.list
+  args:
+    creates: /etc/apt/sources.list.d/elastic-{{ elasticsearch_version_major }}.x.list
+  tags: elasticsearch
+
+- name: Update apt cache after adding repository
+  apt:
+    update_cache: yes
+  tags: elasticsearch
+
+- name: Install Elasticsearch
+  apt:
+    name: "elasticsearch{% if elasticsearch_version is defined and elasticsearch_version != 'latest' %}={{ elasticsearch_version }}{% endif %}"
+    state: present
+  register: elastic_install
+  tags: elasticsearch
+
+# Create data directory AFTER elasticsearch package is installed
+- name: Create base data directory
+  file:
+    path: "/mnt/data"
+    state: directory
+    mode: '0755'
+  ignore_errors: yes
+  tags: elasticsearch
+
+- name: Create Elasticsearch data directory
+  file:
+    path: "{{ elasticsearch_data_dir }}"
+    state: directory
+    mode: '0755'
+    owner: elasticsearch
+    group: elasticsearch
+  ignore_errors: yes
+  tags: elasticsearch
+
+# Create certificates directory
+- name: Create certificates directory
+  file:
+    path: "/etc/elasticsearch/certs"
+    state: directory
+    mode: '0755'
+    owner: elasticsearch
+    group: elasticsearch
+  tags: elasticsearch
+
+# Generate self-signed certificates for Elasticsearch
+- name: Check if transport certificates already exist
+  stat:
+    path: "/etc/elasticsearch/certs/transport.p12"
+  register: transport_cert_exists
+  tags: elasticsearch
+
+- name: Check if http certificates already exist
+  stat:
+    path: "/etc/elasticsearch/certs/http.p12"
+  register: http_cert_exists
+  tags: elasticsearch
+
+- name: Create CA certificate
+  shell: >
+    /usr/share/elasticsearch/bin/elasticsearch-certutil ca
+    --pass ""
+    --out /etc/elasticsearch/certs/elastic-stack-ca.p12
+  args:
+    creates: /etc/elasticsearch/certs/elastic-stack-ca.p12
+  when: elasticsearch_auto_generate_certs | default(true) and not transport_cert_exists.stat.exists
+  tags: elasticsearch
+
+- name: Create transport certificates for SSL transport
+  shell: >
+    /usr/share/elasticsearch/bin/elasticsearch-certutil cert
+    --ca /etc/elasticsearch/certs/elastic-stack-ca.p12
+    --ca-pass ""
+    --name transport
+    --pass ""
+    --dns {{ ansible_hostname }},{{ ansible_fqdn }},{{ ansible_host | default(inventory_hostname) }}
+    --ip {{ ansible_host | default('127.0.0.1') }}
+    --out /etc/elasticsearch/certs/transport.p12
+  args:
+    creates: /etc/elasticsearch/certs/transport.p12
+  when: elasticsearch_auto_generate_certs | default(true) and not transport_cert_exists.stat.exists
+  tags: elasticsearch
+
+- name: Create HTTP certificates for SSL HTTP
+  shell: >
+    /usr/share/elasticsearch/bin/elasticsearch-certutil cert
+    --ca /etc/elasticsearch/certs/elastic-stack-ca.p12
+    --ca-pass ""
+    --name http
+    --pass ""
+    --dns {{ ansible_hostname }},{{ ansible_fqdn }},{{ ansible_host | default(inventory_hostname) }}
+    --ip {{ ansible_host | default('127.0.0.1') }}
+    --out /etc/elasticsearch/certs/http.p12
+  args:
+    creates: /etc/elasticsearch/certs/http.p12
+  when: elasticsearch_auto_generate_certs | default(true) and not http_cert_exists.stat.exists
+  tags: elasticsearch
+
+- name: Set correct permissions on certificates
+  file:
+    path: "/etc/elasticsearch/certs"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch 
+    mode: '0750'
+    recurse: yes
+  tags: elasticsearch
+
+# Check directory ownership
+- name: Verify data directory permissions
+  shell: >
+    if [ ! -d {{ elasticsearch_data_dir }} ]; then
+      echo "Data directory does not exist" && exit 1;
+    else
+      ls -la {{ elasticsearch_data_dir }};
+    fi
+  register: dir_check
+  ignore_errors: yes
+  changed_when: false
+  tags: elasticsearch
+
+- name: Show data directory status
+  debug:
+    msg: "{{ dir_check.stdout_lines }}"
+  tags: elasticsearch
+
+# Capture password from installation output
+- name: Capture elastic superuser password from installation log
+  shell: >
+    grep -A 20 "Security autoconfiguration information" /var/log/elasticsearch/elasticsearch*.log | 
+    grep -m 1 "The generated password for the elastic built-in superuser is" | 
+    awk -F ': ' '{print $2}'
+  register: elastic_password
+  ignore_errors: yes
+  tags: elasticsearch
+
+- name: Display elastic superuser password
+  debug:
+    msg: "Elastic superuser password: {{ elastic_password.stdout }}"
+  when: 
+    - elastic_password is defined 
+    - elastic_password.stdout is defined
+    - elastic_password.stdout != ''
+  tags: elasticsearch
+
+- name: Save Elasticsearch credentials to file
+  copy:
+    content: |
+      Elasticsearch Credentials
+      ------------------------
+      Username: elastic
+      Password: {{ elastic_password.stdout }}
+      
+      These credentials can be used to log into both Elasticsearch and Kibana.
+      Please store this information securely.
+    dest: "/etc/elasticsearch/elastic_credentials.txt"
+    mode: '0600'
+  when: 
+    - elastic_password is defined 
+    - elastic_password.stdout is defined
+    - elastic_password.stdout != ''
+  tags: elasticsearch
+
+- name: Backup original Elasticsearch configuration
+  copy:
+    src: /etc/elasticsearch/elasticsearch.yml
+    dest: /etc/elasticsearch/elasticsearch.yml.backup
+    remote_src: yes
+    force: no
+  ignore_errors: yes
+  when: elastic_install.changed
+  tags: elasticsearch
+
+# Configuration
+- name: Configure Elasticsearch
+  template:
+    src: elasticsearch.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+    owner: root
+    group: elasticsearch
+    mode: '0660'
+  notify: restart elasticsearch
+  tags: elasticsearch
+
+# JVM configuration
+- name: Configure JVM options
+  template:
+    src: jvm.options.j2
+    dest: /etc/elasticsearch/jvm.options.d/heap.options
+    owner: root
+    group: elasticsearch
+    mode: '0660'
+  notify: restart elasticsearch
+  tags: elasticsearch
+
+# Check Elasticsearch configuration
+- name: Verify Elasticsearch configuration
+  shell: /usr/share/elasticsearch/bin/elasticsearch-node --verbose repurpose || echo "Config check complete"
+  register: config_check
+  changed_when: false
+  ignore_errors: yes
+  tags: elasticsearch
+
+- name: Show configuration check result
+  debug:
+    msg: "{{ config_check.stdout_lines }}"
+  tags: elasticsearch
+
+# Service setup
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+  tags: elasticsearch
+
+# Master node specific tasks - Initial configuration and bootstrap
+- name: Configure master node bootstrap settings
+  when: elasticsearch_node_role == 'master'
+  block:
+    - name: Set initial master nodes for bootstrap
+      set_fact:
+        elasticsearch_initial_master_nodes: "{{ groups['elasticsearch_master'] | map('extract', hostvars, ['elasticsearch_node_name']) | list }}"
+      run_once: true
+      
+    - name: Set discovery seed hosts
+      set_fact:
+        elasticsearch_discovery_seed_hosts: "{{ groups['elasticsearch'] | map('extract', hostvars, ['ansible_host']) | list }}"
+      run_once: true
+
+# System settings
+- name: Configure system settings for Elasticsearch
+  sysctl:
+    name: vm.max_map_count
+    value: '262144'
+    state: present
+    reload: yes
+  tags: elasticsearch
+
+- name: Enable and start Elasticsearch service
+  systemd:
+    name: elasticsearch
+    enabled: yes
+    state: started
+  register: es_service_start
+  tags: elasticsearch
+
+# Capture service logs on failure
+- name: Get Elasticsearch service logs if service start failed
+  shell: journalctl -xeu elasticsearch.service | tail -50
+  register: es_service_logs
+  when: es_service_start is failed
+  changed_when: false
+  tags: elasticsearch
+
+- name: Display Elasticsearch service logs on failure
+  debug:
+    msg: "{{ es_service_logs.stdout_lines }}"
+  when: es_service_start is failed
+  tags: elasticsearch
+
+# Add helper script for retrieving credentials
+- name: Copy credentials helper script
+  copy:
+    src: get_elastic_credentials.sh
+    dest: /usr/local/bin/get_elastic_credentials.sh
+    mode: '0755'
+    owner: root
+    group: root
+  tags: elasticsearch
+
+# Only run these tasks on master node
+- name: Master node enrollment tasks
+  when: elasticsearch_node_role == 'master'
+  block:
+    - name: Wait for Elasticsearch to start on master
+      wait_for:
+        host: localhost
+        port: 9200
+        delay: 10
+        timeout: 300
+      tags: elasticsearch
+
+    - name: Create node enrollment token
+      shell: /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s node
+      register: node_enrollment
+      ignore_errors: yes
+      tags: elasticsearch
+
+    - name: Display node enrollment token
+      debug:
+        msg: "Node enrollment token: {{ node_enrollment.stdout }}"
+      when: node_enrollment.stdout is defined
+      tags: elasticsearch
+      
+    - name: Save enrollment token to local file
+      copy:
+        content: "{{ node_enrollment.stdout }}"
+        dest: "/etc/elasticsearch/node_enrollment_token"
+        mode: '0600'
+      when: node_enrollment.stdout is defined and node_enrollment.stdout != ""
+      tags: elasticsearch
+
+    - name: Fetch enrollment token to control machine
+      fetch:
+        src: "/etc/elasticsearch/node_enrollment_token"
+        dest: "/tmp/es_node_enrollment_token"
+        flat: yes
+      when: node_enrollment.stdout is defined and node_enrollment.stdout != ""
+      tags: elasticsearch
+
+    - name: Create Kibana enrollment token
+      shell: /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana
+      register: kibana_enrollment
+      ignore_errors: yes
+      when: enable_kibana | default(false) | bool
+      tags: elasticsearch
+
+    - name: Display Kibana enrollment token
+      debug:
+        msg: "Kibana enrollment token: {{ kibana_enrollment.stdout }}"
+      when: kibana_enrollment.stdout is defined
+      tags: elasticsearch
+
+# Data node specific tasks - Join existing cluster if needed
+- name: Data node join cluster tasks
+  when: elasticsearch_node_role == 'data' and elasticsearch_join_master | bool
+  block:
+    - name: Wait for Elasticsearch service to be up on data node
+      wait_for:
+        host: localhost
+        port: 9200
+        delay: 10
+        timeout: 300
+      tags: elasticsearch
+      
+    - name: Display master host for debugging
+      debug:
+        msg: "Using master host: {{ groups['elasticsearch_master'][0] }}"
+      tags: elasticsearch
+      
+    - name: Copy enrollment token from control machine to data node
+      copy:
+        src: "/tmp/es_node_enrollment_token"
+        dest: "/etc/elasticsearch/node_enrollment_token"
+        mode: '0600'
+        owner: elasticsearch
+        group: elasticsearch
+      ignore_errors: yes
+      tags: elasticsearch
+      
+    - name: Read enrollment token from file
+      shell: cat /etc/elasticsearch/node_enrollment_token
+      register: token_file_content
+      ignore_errors: yes
+      tags: elasticsearch
+      
+    - name: Set enrollment token from file
+      set_fact:
+        elasticsearch_enrollment_token: "{{ token_file_content.stdout }}"
+      when: token_file_content.stdout is defined and token_file_content.stdout != ''
+      tags: elasticsearch
+      
+    - name: Display fetched enrollment token
+      debug:
+        msg: "Fetched enrollment token: {{ elasticsearch_enrollment_token | default('Not found') | truncate(10, True) }}..."
+      tags: elasticsearch
+      
+    - name: Add data node to cluster with enrollment token
+      shell: /usr/share/elasticsearch/bin/elasticsearch-reconfigure-node --enrollment-token "{{ elasticsearch_enrollment_token }}"
+      when: elasticsearch_enrollment_token is defined and elasticsearch_enrollment_token | length > 0
+      register: join_result
+      ignore_errors: yes
+      tags: elasticsearch
+      
+    - name: Report node join status
+      debug:
+        msg: "Node join result: {{ join_result.stdout | default('No output') }}"
+      tags: elasticsearch

@@ -93,7 +93,7 @@ variable "volume_size" {
 variable "elasticsearch_version" {
   description = "Elasticsearch version to install"
   type        = string
-  default     = "7.10.2"
+  default     = "8.18.0"
 }
 
 variable "cluster_name" {

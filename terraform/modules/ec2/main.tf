@@ -15,51 +15,87 @@ module "ami_ubuntu_24_04_latest" {
 }
 
 locals {
-  ami_id = module.ami_ubuntu_24_04_latest.ami_id
+  ami_id = var.ami_id != "" ? var.ami_id : module.ami_ubuntu_24_04_latest.ami_id
 
   # Handle tilde expansion for home directory in public key path
   public_key_path = var.public_key != "" ? (
     replace(var.public_key, "~/", pathexpand("~/"))
   ) : ""
+
+  # Merge default and additional tags
+  tags = merge(
+    {
+      Environment = var.environment
+      Project     = "Infrastructure"
+      Name        = var.instance_name
+    },
+    var.additional_tags
+  )
 }
 
-resource "aws_security_group" "vault_sg" {
+resource "aws_security_group" "instance_sg" {
   name        = var.security_group_name
-  description = "Allow SSH and Vault API access"
+  description = "Security group for ${var.instance_name}"
   vpc_id      = var.vpc_id
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  # Default SSH ingress rule
+  dynamic "ingress" {
+    for_each = var.enable_default_ingress_rules ? [1] : []
+    content {
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "SSH access"
+    }
   }
 
-  ingress {
-    from_port   = 8200
-    to_port     = 8200
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  # Default HTTP ingress rule
+  dynamic "ingress" {
+    for_each = var.enable_default_ingress_rules ? [1] : []
+    content {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "HTTP access"
+    }
   }
 
-  ingress {
-    from_port   = 8201
-    to_port     = 8201
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  # Default HTTPS ingress rule
+  dynamic "ingress" {
+    for_each = var.enable_default_ingress_rules ? [1] : []
+    content {
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "HTTPS access"
+    }
   }
 
+  # Custom ingress rules
+  dynamic "ingress" {
+    for_each = var.custom_ingress_rules
+    content {
+      from_port   = ingress.value.from_port
+      to_port     = ingress.value.to_port
+      protocol    = ingress.value.protocol
+      cidr_blocks = ingress.value.cidr_blocks
+      description = ingress.value.description
+    }
+  }
+
+  # Allow all outbound traffic
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound traffic"
   }
 
-  tags = {
-    Environment = var.environment
-    Project     = "Vault"
-  }
+  tags = local.tags
 }
 
 resource "aws_key_pair" "ec2_key" {
@@ -68,39 +104,38 @@ resource "aws_key_pair" "ec2_key" {
   public_key = file(local.public_key_path)
 }
 
-module "vault_server" {
+module "ec2_instance" {
   source  = "terraform-aws-modules/ec2-instance/aws"
   version = "~> 4.3.0"
 
-  name = var.instance_name
+  name  = var.instance_name
+  count = var.instance_count
 
   ami                    = local.ami_id
   instance_type          = var.instance_type
   key_name               = var.public_key != "" ? aws_key_pair.ec2_key[0].key_name : null
   subnet_id              = var.subnet_id
-  vpc_security_group_ids = [aws_security_group.vault_sg.id]
+  vpc_security_group_ids = [aws_security_group.instance_sg.id]
 
+  iam_instance_profile        = var.iam_instance_profile
   associate_public_ip_address = var.associate_public_ip_address
 
   root_block_device = [
     {
       volume_size           = var.volume_size
-      volume_type           = "gp2"
-      delete_on_termination = false
-      # Removing volume tagging to avoid SCP restrictions
+      volume_type           = var.root_volume_type
+      delete_on_termination = var.delete_on_termination
     }
   ]
 
-  # Simply use the user data passed from outside
+  # Use the user data passed from outside
   user_data = var.user_data
 
-  tags = {
-    Environment = var.environment
-    Project     = "Vault"
-  }
+  tags = local.tags
 }
 
 resource "aws_ec2_instance_state" "this" {
-  instance_id = module.vault_server.id
+  count       = var.instance_count
+  instance_id = module.ec2_instance[count.index].id
   state       = var.instance_state
 }

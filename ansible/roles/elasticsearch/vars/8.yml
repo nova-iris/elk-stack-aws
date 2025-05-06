@@ -1,0 +1,18 @@
+---
+# Elasticsearch 8.x specific settings
+
+# Security settings for 8.x
+elasticsearch_xpack_security_enabled: true
+elasticsearch_xpack_security_transport_ssl_enabled: true
+elasticsearch_xpack_security_http_ssl_enabled: true
+elasticsearch_xpack_security_enrollment_enabled: true
+
+# Enable auto-generation of certificates
+elasticsearch_auto_generate_certs: true
+
+# Discovery settings for 8.x
+elasticsearch_discovery_seed_hosts_setting: discovery.seed_hosts
+elasticsearch_initial_master_nodes_setting: cluster.initial_master_nodes
+
+# Auto-configuration and enrollment enabled by default in 8.x
+elasticsearch_auto_configure: true

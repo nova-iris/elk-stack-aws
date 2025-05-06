@@ -1,0 +1,8 @@
+---
+# Kibana 8.x specific settings
+
+# Security settings for 8.x
+kibana_security_enabled: true
+
+# Enrollment is the default method in 8.x
+kibana_use_enrollment_token: true
