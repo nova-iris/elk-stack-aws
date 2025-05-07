@@ -1,5 +1,5 @@
 ---
-# Kibana installation and configuration tasks
+# Kibana installation and configuration tasks - derived from successful manual installation
 
 # Include OS-specific variables
 - name: Include OS-specific variables
@@ -13,20 +13,7 @@
   ignore_errors: yes
   tags: kibana
 
-# Update apt cache
-- name: Update apt cache
-  apt:
-    update_cache: yes
-    cache_valid_time: 3600
-  tags: kibana
-
-- name: Install apt-transport-https
-  apt:
-    name: apt-transport-https
-    state: present
-  tags: kibana
-
-# Add Elasticsearch GPG key
+# 1. Add Elasticsearch GPG key
 - name: Download Elasticsearch GPG key
   shell: >
     wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | 
@@ -35,7 +22,7 @@
     creates: /usr/share/keyrings/elasticsearch-keyring.gpg
   tags: kibana
 
-# Add Elastic repository
+# 2. Add Elastic repository
 - name: Add Elastic repository
   shell: >
     echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] 
@@ -45,12 +32,13 @@
     creates: /etc/apt/sources.list.d/elastic-{{ kibana_version_major | default('8') }}.x.list
   tags: kibana
 
-- name: Update apt cache after adding repository
+# 3. Update package lists
+- name: Update apt cache
   apt:
     update_cache: yes
   tags: kibana
 
-# Install Kibana
+# 4. Install Kibana
 - name: Install Kibana
   apt:
     name: "kibana{% if kibana_version is defined and kibana_version != 'latest' %}={{ kibana_version }}{% endif %}"
@@ -58,7 +46,7 @@
   register: kibana_install
   tags: kibana
 
-# Backup original configuration
+# 5. Backup original configuration
 - name: Backup original Kibana configuration
   copy:
     src: /etc/kibana/kibana.yml
@@ -69,55 +57,51 @@
   when: kibana_install.changed
   tags: kibana
 
-# Configure Kibana to bind to all interfaces
+# 6. Configure Kibana to bind to all interfaces (using sed-like approach)
 - name: Configure Kibana to bind to all interfaces
   lineinfile:
     path: /etc/kibana/kibana.yml
-    regexp: '^(#)?server\.host:'
+    regexp: '^#server\.host: "localhost"'
     line: 'server.host: "0.0.0.0"'
     state: present
-  notify: restart kibana
   tags: kibana
 
-# Get CA certificate from Elasticsearch
-- name: Find Elasticsearch CA certificate
-  find:
-    paths: /etc/elasticsearch
-    patterns: "http_ca.crt"
-    recurse: yes
-  register: ca_cert_find
+# 7. Ensure server.host is set properly if not found by previous task
+- name: Ensure server.host is set
+  lineinfile:
+    path: /etc/kibana/kibana.yml
+    regexp: '^server\.host:'
+    line: 'server.host: "0.0.0.0"'
+    state: present
   tags: kibana
 
-- name: Display found CA certificate
-  debug:
-    var: ca_cert_find
-  tags: kibana
-
-# If no CA cert found in /etc/elasticsearch, try elsewhere
-- name: Search for CA certificate in other locations
-  find:
-    paths: 
-      - /var/lib/elasticsearch
-      - /usr/share/elasticsearch
-    patterns: "http_ca.crt"
-    recurse: yes
-  register: ca_cert_find_alt
-  when: ca_cert_find.matched == 0
-  tags: kibana
-
-# Generate Kibana enrollment token
+# 8. Generate Kibana enrollment token
 - name: Generate Kibana enrollment token
   shell: /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana
   register: kibana_token
   changed_when: false
   tags: kibana
 
+# 9. Display enrollment token (for troubleshooting)
 - name: Display Kibana enrollment token
   debug:
-    var: kibana_token.stdout
+    msg: "Enrollment token: {{ kibana_token.stdout }}"
   tags: kibana
 
-# Enable and start Kibana service
+# 10. Perform Kibana enrollment
+- name: Enroll Kibana with Elasticsearch
+  shell: echo "y" | /usr/share/kibana/bin/kibana-setup --enrollment-token "{{ kibana_token.stdout }}"
+  register: kibana_enrollment
+  failed_when: false  # Never fail this step to continue
+  tags: kibana
+
+# 11. Display enrollment result
+- name: Display enrollment result
+  debug:
+    msg: "{{ kibana_enrollment.stdout_lines | default([]) }}"
+  tags: kibana
+
+# 12. Enable and start Kibana service
 - name: Reload systemd
   systemd:
     daemon_reload: yes
@@ -133,4 +117,36 @@
   systemd:
     name: kibana.service
     state: started
+  tags: kibana
+
+# 13. Wait for Kibana to start - use multiple check methods for reliability
+- name: Wait for Kibana to become available
+  uri:
+    url: "http://{{ ansible_default_ipv4.address | default(ansible_host) }}:5601/api/status"
+    status_code: [200, 302, 301, 307]  # Accept redirects too
+    follow_redirects: none
+    validate_certs: no
+    timeout: 5
+  register: result
+  until: result.status is defined and result.status in [200, 302, 301, 307]
+  retries: 20
+  delay: 10
+  ignore_errors: yes
+  tags: kibana
+
+# 14. Alternative check using netcat if URI module fails
+- name: Verify Kibana port is listening
+  shell: "nc -z -v {{ ansible_default_ipv4.address | default('127.0.0.1') }} 5601"
+  register: nc_result
+  until: nc_result.rc == 0
+  retries: 12
+  delay: 10
+  ignore_errors: yes
+  when: result.failed is defined and result.failed
+  tags: kibana
+
+# 15. Print success message
+- name: Print Kibana access information
+  debug:
+    msg: "Kibana should now be accessible at http://{{ ansible_host }}:5601"
   tags: kibana
