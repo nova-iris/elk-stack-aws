@@ -260,19 +260,19 @@
     - elasticsearch:enrollment
 
 # Check if node is already enrolled in the cluster
-- name: Check if node is already enrolled in the Elasticsearch cluster
-  shell: grep -q "cluster.initial_master_nodes\|discovery.seed_hosts" /etc/elasticsearch/elasticsearch.yml || grep -q "Security autoconfiguration information" /var/log/elasticsearch/elasticsearch*.log
-  register: node_already_enrolled
-  ignore_errors: yes
-  changed_when: false
-  when:
-    - "'elasticsearch_data' in group_names"
-    - "'elasticsearch_master' not in group_names"
-    - elasticsearch_version_major | int >= 8
-    - node_enrollment_token is defined
-  tags:
-    - elasticsearch
-    - elasticsearch:enrollment
+# - name: Check if node is already enrolled in the Elasticsearch cluster
+#   shell: grep -q "cluster.initial_master_nodes\|discovery.seed_hosts" /etc/elasticsearch/elasticsearch.yml || grep -q "Security autoconfiguration information" /var/log/elasticsearch/elasticsearch*.log
+#   register: node_already_enrolled
+#   ignore_errors: yes
+#   changed_when: false
+#   when:
+#     - "'elasticsearch_data' in group_names"
+#     - "'elasticsearch_master' not in group_names"
+#     - elasticsearch_version_major | int >= 8
+#     - node_enrollment_token is defined
+#   tags:
+#     - elasticsearch
+#     - elasticsearch:enrollment
 
 # Enroll data nodes to the cluster only if not already enrolled
 - name: Register data nodes to elasticsearch cluster
@@ -284,9 +284,6 @@
     - "'elasticsearch_master' not in group_names"
     - elasticsearch_version_major | int >= 8
     - node_enrollment_token is defined
-    - node_already_enrolled is defined
-    - node_already_enrolled is failed
-  failed_when: enrollment_result.rc != 0 and "Node is already enrolled in a cluster" not in enrollment_result.stderr and "Skipping security auto configuration" not in enrollment_result.stderr
   tags:
     - elasticsearch
     - elasticsearch:enrollment
@@ -294,7 +291,7 @@
 # Print enrollment result
 - name: Print enrollment result
   debug:
-    msg: "{{ enrollment_result.stdout | default('Node was already enrolled in the cluster - skipping enrollment') }}"
+    msg: "{{ enrollment_result.stdout }}"
   when:
     - "'elasticsearch_data' in group_names"
     - "'elasticsearch_master' not in group_names"

@@ -51,4 +51,3 @@
           - "Internal Kibana UI: http://{{ ansible_default_ipv4.address }}:5601"
           - "==========================================================="
       delegate_to: localhost
-      run_once: true

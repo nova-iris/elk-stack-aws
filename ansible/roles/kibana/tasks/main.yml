@@ -76,24 +76,23 @@
   tags: kibana
 
 # 8. Generate Kibana enrollment token
-- name: Check if Kibana is already enrolled
-  shell: "grep -q 'elasticsearch.hosts' /etc/kibana/kibana.yml || (systemctl status kibana && curl -s http://{{ ansible_default_ipv4.address }}:5601)"
-  register: kibana_already_enrolled
-  ignore_errors: yes
-  changed_when: false
-  tags: kibana
+# - name: Check if Kibana is already enrolled
+#   shell: "grep -q 'elasticsearch.hosts' /etc/kibana/kibana.yml || (systemctl status kibana && curl -s http://{{ ansible_default_ipv4.address }}:5601)"
+#   register: kibana_already_enrolled
+#   ignore_errors: yes
+#   changed_when: false
+#   tags: kibana
 
 - name: Generate Kibana enrollment token
   shell: /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana
   register: kibana_token
   changed_when: false
-  when: kibana_already_enrolled is failed
   tags: kibana
 
 # 9. Display enrollment token (for troubleshooting)
 - name: Display Kibana enrollment token
   debug:
-    msg: "Enrollment token: {{ kibana_token.stdout | default('Not generated - Kibana likely already enrolled') }}"
+    msg: "Enrollment token: {{ kibana_token.stdout }}"
   tags: kibana
 
 # 10. Perform Kibana enrollment
@@ -101,7 +100,6 @@
   shell: echo "y" | /usr/share/kibana/bin/kibana-setup --enrollment-token "{{ kibana_token.stdout }}"
   register: kibana_enrollment
   failed_when: false  # Never fail this step to continue
-  when: kibana_already_enrolled is failed and kibana_token is defined and kibana_token.stdout is defined
   tags: kibana
 
 # 11. Display enrollment result
@@ -131,7 +129,7 @@
 # 13. Wait for Kibana to start - use multiple check methods for reliability
 - name: Wait for Kibana to become available
   uri:
-    url: "http://{{ ansible_default_ipv4.address }}:5601/api/status"
+    url: "http://{{ ansible_default_ipv4.address | default(ansible_host) }}:5601/api/status"
     status_code: [200, 302, 301, 307]  # Accept redirects too
     follow_redirects: none
     validate_certs: no
