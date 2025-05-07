@@ -102,6 +102,7 @@
   with_items:
     - { regexp: '^(#)?network\.host:.*', line: 'network.host: 0.0.0.0' }
     - { regexp: '^(#)?cluster\.name:.*', line: 'cluster.name: es-poc' }
+    - { regexp: '^(#)?node\.name:.*', line: 'node.name: {{ ansible_hostname }}' }
     - { regexp: '^(#)?path\.data:.*', line: 'path.data: /mnt/data/elasticsearch' }
   tags:
     - elasticsearch
@@ -204,6 +205,19 @@
     - elasticsearch
     - elasticsearch:enrollment
 
+# Print enrollment result
+- name: Print enrollment result
+  debug:
+    msg: "Enrollment result: {{ enrollment_result.stdout }}"
+  when:
+    - "'elasticsearch_data' in group_names"
+    - "'elasticsearch_master' not in group_names"
+    - elasticsearch_version_major | int >= 8
+    - node_enrollment_token is defined
+  tags:
+    - elasticsearch
+    - elasticsearch:enrollment
+
 # Clean up enrollment token files
 - name: Remove enrollment token files
   file:
@@ -213,3 +227,22 @@
   tags:
     - elasticsearch
     - elasticsearch:enrollment
+
+# Enable and start service on data nodes
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+  when: "'elasticsearch_data' in group_names"
+  tags: elasticsearch
+  
+- name: Enable Elasticsearch service on data nodes
+  systemd:
+    name: elasticsearch.service
+    enabled: yes
+  when: "'elasticsearch_data' in group_names"
+
+- name: Start Elasticsearch service on data nodes
+  systemd:
+    name: elasticsearch.service
+    state: started
+  when: "'elasticsearch_data' in group_names"
