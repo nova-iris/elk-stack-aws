@@ -16,3 +16,39 @@
     - kibana
   tags:
     - kibana
+
+- name: Display ELK Stack credentials and access information
+  hosts: elasticsearch_master
+  become: no
+  gather_facts: yes  # Make sure we have facts available for IP address
+  tasks:
+    - name: Get Elasticsearch credentials from master node
+      shell: cat /etc/elasticsearch/elastic_credentials.txt
+      register: elastic_stored_credentials
+      become: yes
+      ignore_errors: yes
+      changed_when: false
+      
+    - name: Display ELK Stack Summary
+      debug:
+        msg:
+          - "==========================================================="
+          - "                ELK STACK DEPLOYMENT SUMMARY                "
+          - "==========================================================="
+          - "Elasticsearch cluster name: es-poc"
+          - "Elasticsearch endpoint: https://{{ ansible_host }}:9200"
+          - "Kibana URL: http://{{ ansible_host }}:5601"
+          - "Username: elastic"
+          - "Password: {{ elastic_stored_credentials.stdout | default(hostvars[inventory_hostname]['elastic_password'] | default('Password not found - check /var/log/elasticsearch/elasticsearch.log')) }}"
+          - "==========================================================="
+          - "Elasticsearch data nodes:"
+          - "{% for host in groups['elasticsearch_data'] %}  - {{ host }} ({{ hostvars[host].ansible_hostname | default(host) }}){% endfor %}"
+          - "==========================================================="
+          - "Credentials are also stored at: /etc/elasticsearch/elastic_credentials.txt"
+          - "==========================================================="
+          - "Note: For internal network access (if using VPN):"  
+          - "Internal Elasticsearch API: https://{{ ansible_default_ipv4.address }}:9200"
+          - "Internal Kibana UI: http://{{ ansible_default_ipv4.address }}:5601"
+          - "==========================================================="
+      delegate_to: localhost
+      run_once: true
