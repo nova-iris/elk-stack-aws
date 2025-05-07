@@ -19,7 +19,7 @@
 
 - name: Display ELK Stack credentials and access information
   hosts: elasticsearch_master
-  become: yes  # Changed to yes to ensure we can read credential files
+  become: yes
   gather_facts: yes
   tasks:
     - name: Get Elasticsearch credentials from master node
@@ -32,27 +32,38 @@
         es_password: "{{ elastic_stored_credentials.stdout | default('Password not found') }}"
         es_master_ip: "{{ ansible_host }}"
         es_internal_ip: "{{ ansible_default_ipv4.address }}"
+        
+    - name: Format data nodes list
+      set_fact:
+        data_nodes_list: "{% for host in groups['elasticsearch_data'] %}  - {{ host }} ({{ hostvars[host].elasticsearch_node_role | default('data') }}){% endfor %}"
+
+    # Directly output the summary using debug module with no quotes
+    - name: Create a multiline string with summary information
+      set_fact:
+        summary_text: |
+          ===========================================================
+                          ELK STACK DEPLOYMENT SUMMARY                
+          ===========================================================
+          Elasticsearch cluster name: es-poc
+          Elasticsearch endpoint: https://{{ es_master_ip }}:9200
+          Kibana URL: http://{{ es_master_ip }}:5601
+          Username: elastic
+          Password: {{ es_password }}
+          ===========================================================
+          Elasticsearch data nodes:
+          {{ data_nodes_list }}
+          ===========================================================
+          Credentials are stored at: /etc/elasticsearch/elastic_credentials.txt
+          ===========================================================
+          Note: For internal network access (if using VPN):
+          Internal Elasticsearch API: https://{{ es_internal_ip }}:9200
+          Internal Kibana UI: http://{{ es_internal_ip }}:5601
+          ===========================================================
+      delegate_to: localhost
+      run_once: true
       
-    - name: Display ELK Stack Summary
+    - name: Display summary (without quotes)
       debug:
-        msg:
-          - "==========================================================="
-          - "                ELK STACK DEPLOYMENT SUMMARY                "
-          - "==========================================================="
-          - "Elasticsearch cluster name: es-poc"
-          - "Elasticsearch endpoint: https://{{ es_master_ip }}:9200"
-          - "Kibana URL: http://{{ es_master_ip }}:5601"
-          - "Username: elastic"
-          - "Password: {{ es_password }}"
-          - "==========================================================="
-          - "Elasticsearch data nodes:"
-          - "{% for host in groups['elasticsearch_data'] %}  - {{ host }} ({{ hostvars[host].elasticsearch_node_role | default('data') }}){% endfor %}"
-          - "==========================================================="
-          - "Credentials are stored at: /etc/elasticsearch/elastic_credentials.txt"
-          - "==========================================================="
-          - "Note: For internal network access (if using VPN):"  
-          - "Internal Elasticsearch API: https://{{ es_internal_ip }}:9200"
-          - "Internal Kibana UI: http://{{ es_internal_ip }}:5601"
-          - "==========================================================="
+        msg: "{{ summary_text }}"
       delegate_to: localhost
       run_once: true
