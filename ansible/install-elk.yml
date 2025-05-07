@@ -8,3 +8,11 @@
     - elasticsearch
   tags:
     - elasticsearch
+
+- name: Install and configure Kibana on master nodes
+  hosts: elasticsearch_master
+  become: yes
+  roles:
+    - kibana
+  tags:
+    - kibana

@@ -6,16 +6,22 @@
 # https://www.elastic.co/guide/en/kibana/current/settings.html
 
 # ---------------------------------- Server ------------------------------------
-server.host: "{{ kibana_host }}"
-server.port: {{ kibana_port }}
+server.host: "0.0.0.0"
+server.port: 5601
 
 # ---------------------------------- Elasticsearch ----------------------------
-{% if not kibana_use_enrollment_token %}
-elasticsearch.hosts: [{% for host in kibana_elasticsearch_hosts %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
-elasticsearch.username: "{{ kibana_elasticsearch_username }}"
-elasticsearch.password: "{{ kibana_elasticsearch_password | default('') }}"
-elasticsearch.ssl.verificationMode: "{{ kibana_elasticsearch_ssl_verification_mode }}"
+elasticsearch.hosts: ["https://localhost:9200"]
+elasticsearch.username: "elastic"
+elasticsearch.password: "{{ elasticsearch_password | default('') }}"
+
+{% if elasticsearch_ca_cert is defined and elasticsearch_ca_cert != '' %}
+elasticsearch.ssl.certificateAuthorities: ["{{ elasticsearch_ca_cert }}"]
+elasticsearch.ssl.verificationMode: "certificate"
 {% endif %}
+
+# Uncomment the following lines if enrollment token process is used
+# xpack.fleet.agents.elasticsearch.hosts: ["https://localhost:9200"]
+# xpack.fleet.outputs.default.hosts: ["https://localhost:9200"]
 
 # ---------------------------------- Logging ----------------------------------
 logging.root.level: info

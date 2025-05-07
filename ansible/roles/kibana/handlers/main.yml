@@ -1,11 +1,11 @@
 ---
-# Handlers for Kibana
+# Handlers for Kibana role
 
 - name: restart kibana
   systemd:
     name: kibana
     state: restarted
-    daemon_reload: yes
+  listen: restart kibana
 
 - name: kibana started
   debug:

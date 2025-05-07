@@ -1,5 +1,5 @@
 ---
-# Main tasks for Kibana role
+# Kibana installation and configuration tasks
 
 # Include OS-specific variables
 - name: Include OS-specific variables
@@ -13,7 +13,7 @@
   ignore_errors: yes
   tags: kibana
 
-# VM preparation tasks
+# Update apt cache
 - name: Update apt cache
   apt:
     update_cache: yes
@@ -26,32 +26,23 @@
     state: present
   tags: kibana
 
-# Install required packages for API interactions
-- name: Install required packages for API interactions
-  apt:
-    name: 
-      - curl
-      - jq
-      - expect
-    state: present
-  tags: kibana
-
-# Kibana installation
+# Add Elasticsearch GPG key
 - name: Download Elasticsearch GPG key
   shell: >
     wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | 
-    sudo gpg --dearmor -o /usr/share/keyrings/elastic-keyring.gpg
+    sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
   args:
-    creates: /usr/share/keyrings/elastic-keyring.gpg
+    creates: /usr/share/keyrings/elasticsearch-keyring.gpg
   tags: kibana
 
+# Add Elastic repository
 - name: Add Elastic repository
   shell: >
-    echo "deb [signed-by=/usr/share/keyrings/elastic-keyring.gpg] 
-    https://artifacts.elastic.co/packages/{{ kibana_version_major }}.x/apt stable main" | 
-    sudo tee /etc/apt/sources.list.d/elastic-{{ kibana_version_major }}.x.list
+    echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] 
+    https://artifacts.elastic.co/packages/{{ kibana_version_major | default('8') }}.x/apt stable main" | 
+    sudo tee /etc/apt/sources.list.d/elastic-{{ kibana_version_major | default('8') }}.x.list
   args:
-    creates: /etc/apt/sources.list.d/elastic-{{ kibana_version_major }}.x.list
+    creates: /etc/apt/sources.list.d/elastic-{{ kibana_version_major | default('8') }}.x.list
   tags: kibana
 
 - name: Update apt cache after adding repository
@@ -59,6 +50,7 @@
     update_cache: yes
   tags: kibana
 
+# Install Kibana
 - name: Install Kibana
   apt:
     name: "kibana{% if kibana_version is defined and kibana_version != 'latest' %}={{ kibana_version }}{% endif %}"
@@ -66,6 +58,7 @@
   register: kibana_install
   tags: kibana
 
+# Backup original configuration
 - name: Backup original Kibana configuration
   copy:
     src: /etc/kibana/kibana.yml
@@ -76,54 +69,52 @@
   when: kibana_install.changed
   tags: kibana
 
-# Get Elasticsearch password for automated enrollment
-- name: Get Elasticsearch elastic user password
-  shell: >
-    grep -A20 "Security autoconfiguration information" /var/log/elasticsearch/elasticsearch.log | 
-    grep -m1 "The generated password for the elastic built-in superuser is" | 
-    awk -F ': ' '{print $2}'
-  register: elastic_password
-  ignore_errors: yes
-  tags: kibana
-  when: kibana_automation | default(true)
-
-- name: Store elastic password for later use
-  set_fact:
-    elasticsearch_password: "{{ elastic_password.stdout }}"
-  when: 
-    - elastic_password is defined 
-    - elastic_password.stdout is defined
-    - elastic_password.stdout != ""
-  tags: kibana
-
-# Configuration
-- name: Configure Kibana
-  template:
-    src: kibana.yml.j2
-    dest: /etc/kibana/kibana.yml
-    owner: kibana
-    group: kibana
-    mode: '0660'
+# Configure Kibana to bind to all interfaces
+- name: Configure Kibana to bind to all interfaces
+  lineinfile:
+    path: /etc/kibana/kibana.yml
+    regexp: '^(#)?server\.host:'
+    line: 'server.host: "0.0.0.0"'
+    state: present
   notify: restart kibana
   tags: kibana
 
-# Fetch enrollment token from Elasticsearch for Kibana
-- name: Get Elasticsearch enrollment token for Kibana
+# Get CA certificate from Elasticsearch
+- name: Find Elasticsearch CA certificate
+  find:
+    paths: /etc/elasticsearch
+    patterns: "http_ca.crt"
+    recurse: yes
+  register: ca_cert_find
+  tags: kibana
+
+- name: Display found CA certificate
+  debug:
+    var: ca_cert_find
+  tags: kibana
+
+# If no CA cert found in /etc/elasticsearch, try elsewhere
+- name: Search for CA certificate in other locations
+  find:
+    paths: 
+      - /var/lib/elasticsearch
+      - /usr/share/elasticsearch
+    patterns: "http_ca.crt"
+    recurse: yes
+  register: ca_cert_find_alt
+  when: ca_cert_find.matched == 0
+  tags: kibana
+
+# Generate Kibana enrollment token
+- name: Generate Kibana enrollment token
   shell: /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana
-  register: kibana_enrollment
-  ignore_errors: yes
+  register: kibana_token
+  changed_when: false
   tags: kibana
 
 - name: Display Kibana enrollment token
   debug:
-    msg: "Kibana Enrollment Token: {{ kibana_enrollment.stdout }}"
-  when: kibana_enrollment is defined and kibana_enrollment.stdout is defined and kibana_enrollment.stdout != ""
-  tags: kibana
-
-- name: Store enrollment token for later use
-  set_fact:
-    kibana_token: "{{ kibana_enrollment.stdout }}"
-  when: kibana_enrollment is defined and kibana_enrollment.stdout is defined and kibana_enrollment.stdout != ""
+    var: kibana_token.stdout
   tags: kibana
 
 # Enable and start Kibana service
@@ -134,171 +125,12 @@
 
 - name: Enable Kibana service
   systemd:
-    name: kibana
+    name: kibana.service
     enabled: yes
   tags: kibana
 
 - name: Start Kibana service
   systemd:
-    name: kibana
+    name: kibana.service
     state: started
-  notify: kibana started
-  tags: kibana
-
-# Wait for Kibana to start fully
-- name: Wait for Kibana to start
-  wait_for:
-    host: localhost
-    port: "{{ kibana_port }}"
-    delay: 10
-    timeout: 180
-  tags: kibana
-
-# Extract verification code from logs
-- name: Extract Kibana verification code from logs
-  shell: >
-    journalctl -u kibana --no-pager | 
-    grep -E "verification code|verification.*code" | 
-    grep -E -o "[0-9]{6}" || echo ""
-  register: kibana_verification_code
-  ignore_errors: yes
-  retries: 5
-  delay: 10
-  until: kibana_verification_code.rc == 0
-  tags: kibana
-
-- name: Display Kibana verification code
-  debug:
-    msg: "Kibana verification code: {{ kibana_verification_code.stdout }}"
-  when: kibana_verification_code is defined and kibana_verification_code.stdout is defined and kibana_verification_code.stdout != ""
-  tags: kibana
-
-- name: Store verification code for later use
-  set_fact:
-    kibana_code: "{{ kibana_verification_code.stdout }}"
-  when: kibana_verification_code is defined and kibana_verification_code.stdout is defined and kibana_verification_code.stdout != ""
-  tags: kibana
-
-# Automated enrollment process
-- name: Create directories for automation scripts
-  file:
-    path: "/tmp/kibana-automation"
-    state: directory
-    mode: '0755'
-  tags: kibana
-  when: kibana_automation | default(true)
-
-# Create script to automate the enrollment process
-- name: Create automation script for Kibana enrollment
-  template:
-    src: kibana_enroll.sh.j2
-    dest: /tmp/kibana-automation/kibana_enroll.sh
-    mode: '0755'
-  when: 
-    - kibana_automation | default(true)
-    - kibana_token is defined
-    - kibana_code is defined
-  tags: kibana
-
-# Run the enrollment automation script
-- name: Run Kibana enrollment automation script
-  shell: /tmp/kibana-automation/kibana_enroll.sh
-  register: enrollment_result
-  ignore_errors: yes
-  when: 
-    - kibana_automation | default(true)
-    - kibana_token is defined
-    - kibana_code is defined
-  tags: kibana
-
-- name: Display enrollment result
-  debug:
-    msg: "{{ enrollment_result.stdout_lines | default([]) }}"
-  when: enrollment_result is defined and enrollment_result.stdout is defined
-  tags: kibana
-
-# Wait for Kibana to be fully operational after enrollment
-- name: Wait for Kibana API to be available after enrollment
-  uri:
-    url: "https://localhost:5601/api/status"
-    validate_certs: false
-    status_code: 200
-    user: elastic
-    password: "{{ elasticsearch_password }}"
-  register: kibana_status
-  until: kibana_status.status == 200
-  retries: 30
-  delay: 10
-  ignore_errors: yes
-  when: 
-    - kibana_automation | default(true)
-    - elasticsearch_password is defined
-  tags: kibana
-
-# Create API key for Logstash
-- name: Create API key for Logstash
-  uri:
-    url: "https://localhost:5601/api/security/api_key"
-    validate_certs: false
-    method: POST
-    body_format: json
-    body: >
-      {
-        "name": "logstash_api_key",
-        "role_descriptors": {
-          "logstash_writer": {
-            "cluster": ["manage_index_templates", "monitor", "manage_ilm"],
-            "indices": [
-              {
-                "names": ["logstash-*"],
-                "privileges": ["write", "create", "create_index", "manage", "manage_ilm"]
-              }
-            ]
-          }
-        },
-        "expiration": "{{ kibana_api_key_expiration | default('30d') }}"
-      }
-    status_code: 200
-    user: elastic
-    password: "{{ elasticsearch_password }}"
-  register: api_key_result
-  ignore_errors: yes
-  when: 
-    - kibana_automation | default(true)
-    - elasticsearch_password is defined
-  tags: kibana
-
-- name: Display API key information
-  debug:
-    msg: 
-      - "API Key ID: {{ api_key_result.json.id }}"
-      - "API Key: {{ api_key_result.json.api_key }}"
-      - "Encoded API Key: {{ api_key_result.json.encoded }}"
-  when: 
-    - api_key_result is defined
-    - api_key_result.json is defined
-    - api_key_result.json.api_key is defined
-  tags: kibana
-
-- name: Save API key information to file
-  copy:
-    content: |
-      API_KEY_ID={{ api_key_result.json.id }}
-      API_KEY={{ api_key_result.json.api_key }}
-      ENCODED_API_KEY={{ api_key_result.json.encoded }}
-    dest: "/etc/elasticsearch/logstash_api_key.txt"
-    mode: '0600'
-  when: 
-    - api_key_result is defined
-    - api_key_result.json is defined 
-    - api_key_result.json.api_key is defined
-  tags: kibana
-
-- name: Provide Kibana access information
-  debug:
-    msg: 
-      - "Kibana has been installed, configured, and automatically enrolled"
-      - "Access Kibana at: https://{{ inventory_hostname }}:{{ kibana_port }}"
-      - "You can log in with username 'elastic' and the password from the Elasticsearch installation"
-      - "API keys for Logstash have been automatically created and stored in /etc/elasticsearch/logstash_api_key.txt"
   tags: kibana
