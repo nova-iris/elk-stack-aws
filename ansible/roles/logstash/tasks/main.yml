@@ -24,14 +24,53 @@
     name: logstash
     state: present
 
-- name: Enable and start Logstash service
-  systemd:
-    name: logstash.service
-    enabled: yes
-    state: started
+# Create certificate directory for Logstash
+- name: Create certificate directory for Logstash
+  file:
+    path: /etc/logstash/certs
+    state: directory
+    owner: logstash
+    group: logstash
+    mode: '0750'
+
+# Fetch Elasticsearch CA certificate from master node
+- name: Fetch Elasticsearch CA certificate from master node
+  delegate_to: "{{ groups['elasticsearch_master'][0] }}"
+  fetch:
+    src: /etc/elasticsearch/certs/http_ca.crt
+    dest: /tmp/http_ca.crt
+    flat: yes
+  when: groups['elasticsearch_master'] is defined and groups['elasticsearch_master']|length > 0
+
+# Deploy Elasticsearch CA certificate to Logstash
+- name: Copy Elasticsearch CA certificate to Logstash
+  copy:
+    src: /tmp/http_ca.crt
+    dest: /etc/logstash/certs/http_ca.crt
+    owner: logstash
+    group: logstash
+    mode: '0640'
+  notify: restart logstash
+
+# Deploy Logstash pipeline configuration
+- name: Deploy Logstash pipeline configuration
+  template:
+    src: 01-beat.conf.j2
+    dest: /etc/logstash/conf.d/01-beat.conf
+    owner: logstash
+    group: logstash
+    mode: '0640'
+  # notify: restart logstash
 
 - name: Install Logstash Beats plugin
   command: /usr/share/logstash/bin/logstash-plugin install logstash-input-beats
   register: plugin_result
   changed_when: "'Successfully installed' in plugin_result.stdout"
   failed_when: "plugin_result.rc != 0 and 'Plugin already exist' not in plugin_result.stderr"
+
+- name: Enable and start Logstash service
+  systemd:
+    name: logstash.service
+    enabled: yes
+    state: started
+
