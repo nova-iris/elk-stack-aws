@@ -1,19 +1,18 @@
 # Ansible inventory generated from Terraform outputs
-# Generated on: 2025-05-06T04:27:38Z
+# Generated on: 2025-05-08T04:12:22Z
 
 [elasticsearch_master]
-3.214.143.105 elasticsearch_node_role=master ansible_user=ubuntu
+54.146.241.99 elasticsearch_node_role=master ansible_user=ubuntu
 
 [elasticsearch_data]
-3.214.143.105 elasticsearch_node_role=data ansible_user=ubuntu
-54.91.203.24 elasticsearch_node_role=data ansible_user=ubuntu
-3.80.105.248 elasticsearch_node_role=data ansible_user=ubuntu
+54.242.215.94 elasticsearch_node_role=data ansible_user=ubuntu
+54.91.93.72 elasticsearch_node_role=data ansible_user=ubuntu
 
 [logstash]
-3.221.149.111 ansible_user=ubuntu
+100.26.22.156 ansible_user=ubuntu
 
 [filebeat]
-34.236.243.47 ansible_user=ubuntu
+54.84.188.170 ansible_user=ubuntu
 
 [elasticsearch:children]
 elasticsearch_master
@@ -27,16 +26,16 @@ filebeat
 [elasticsearch:vars]
 ansible_ssh_private_key_file=~/.ssh/id_ed25519
 ansible_python_interpreter=/usr/bin/python3
-elasticsearch_cluster_name=elk-cluster
-elasticsearch_version=8.19
+elasticsearch_cluster_name=es-poc
+elasticsearch_version=8.18.0
 enable_kibana=true
 
 [logstash:vars]
 ansible_ssh_private_key_file=~/.ssh/id_ed25519
 ansible_python_interpreter=/usr/bin/python3
-elasticsearch_host=10.22.0.47
+elasticsearch_host=10.22.0.15
 
 [filebeat:vars]
 ansible_ssh_private_key_file=~/.ssh/id_ed25519
 ansible_python_interpreter=/usr/bin/python3
-logstash_host=10.22.0.176
+logstash_host=10.22.0.242

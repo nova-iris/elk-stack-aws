@@ -10,7 +10,9 @@ ${instance.public_ip} elasticsearch_node_role=master ansible_user=ubuntu
 
 [elasticsearch_data]
 %{ for index, instance in elasticsearch_instances ~}
+%{ if index > 0 ~}
 ${instance.public_ip} elasticsearch_node_role=data ansible_user=ubuntu
+%{ endif ~}
 %{ endfor ~}
 
 [logstash]

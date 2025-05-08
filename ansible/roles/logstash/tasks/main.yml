@@ -1,0 +1,37 @@
+---
+# Logstash installation tasks
+
+- name: Add Elasticsearch GPG key
+  ansible.builtin.shell: wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo gpg --dearmor -o /usr/share/keyrings/elastic-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/elastic-keyring.gpg
+  changed_when: false
+  
+- name: Add Elastic repository
+  ansible.builtin.shell: >
+    echo "deb [signed-by=/usr/share/keyrings/elastic-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | 
+    sudo tee /etc/apt/sources.list.d/elastic-8.x.list
+  args:
+    creates: /etc/apt/sources.list.d/elastic-8.x.list
+  changed_when: false
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install Logstash
+  apt:
+    name: logstash
+    state: present
+
+- name: Enable and start Logstash service
+  systemd:
+    name: logstash.service
+    enabled: yes
+    state: started
+
+- name: Install Logstash Beats plugin
+  command: /usr/share/logstash/bin/logstash-plugin install logstash-input-beats
+  register: plugin_result
+  changed_when: "'Successfully installed' in plugin_result.stdout"
+  failed_when: "plugin_result.rc != 0 and 'Plugin already exist' not in plugin_result.stderr"

@@ -17,6 +17,14 @@
   tags:
     - kibana
 
+- name: Install and configure Logstash on logstash nodes
+  hosts: logstash
+  become: yes
+  roles:
+    - logstash
+  tags:
+    - logstash
+
 - name: Display ELK Stack credentials and access information
   hosts: elasticsearch_master
   become: yes
