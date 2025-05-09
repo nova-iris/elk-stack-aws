@@ -48,6 +48,18 @@ Use the included `deploy-elk-stack.sh` script to handle both infrastructure prov
 
 ```bash
 cd /path/to/elk-stack-setup
+```
+
+**Important**: Before running the deployment script, create your `terraform.tfvars` file:
+
+```bash
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+# Edit terraform.tfvars with your AWS credentials and configuration settings
+```
+
+Then run the deployment script:
+
+```bash
 ./deploy-elk-stack.sh
 ```
 
@@ -87,10 +99,10 @@ If you prefer to run Terraform and Ansible separately:
 ```bash
 cd /path/to/elk-stack-setup/terraform
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your settings
+# Edit terraform.tfvars with your AWS credentials and settings
 terraform init
 terraform plan -out=tfplan
-terraform apply -auto-approve tfplan
+terraform apply -auto-approve
 ```
 
 #### 2. Ansible Configuration
