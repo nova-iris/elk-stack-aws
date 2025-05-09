@@ -1,0 +1,22 @@
+- module: system
+  # Syslog
+  syslog:
+    enabled: {{ filebeat_syslog_enabled | default(true) }}
+
+    # Set custom paths for the log files. If left empty,
+    # Filebeat will choose the paths depending on your OS.
+    var.paths: {{ filebeat_syslog_paths | default(["/var/log/syslog*"]) }}
+
+    # Use journald to collect system logs
+    #var.use_journald: false
+    
+  # Authorization logs
+  auth:
+    enabled: {{ filebeat_auth_enabled | default(false) }}
+
+    # Set custom paths for the log files. If left empty,
+    # Filebeat will choose the paths depending on your OS.
+    var.paths: {{ filebeat_auth_paths | default(["/var/log/auth.log*"]) }}
+
+    # Use journald to collect auth logs
+    #var.use_journald: false

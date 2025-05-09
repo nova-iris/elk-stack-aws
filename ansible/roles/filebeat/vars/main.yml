@@ -1,0 +1,14 @@
+---
+# Variables for the Filebeat system module
+
+# Enable/disable syslog collection
+filebeat_syslog_enabled: true
+# Syslog paths configuration
+filebeat_syslog_paths: ["/var/log/syslog*"]
+
+# Enable/disable auth log collection
+filebeat_auth_enabled: true
+# Auth log paths configuration
+filebeat_auth_paths: ["/var/log/auth.log*"]
+
+# Additional Filebeat variables can be added here

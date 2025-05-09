@@ -25,6 +25,14 @@
   tags:
     - logstash
 
+- name: Install and configure Filebeat on filebeat nodes
+  hosts: filebeat
+  become: yes
+  roles:
+    - filebeat
+  tags:
+    - filebeat
+
 - name: Display ELK Stack credentials and access information
   hosts: elasticsearch_master
   become: yes

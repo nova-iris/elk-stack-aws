@@ -33,6 +33,20 @@
     group: logstash
     mode: '0750'
 
+# Get Elasticsearch credentials from master node
+- name: Get Elasticsearch credentials from master node
+  delegate_to: "{{ groups['elasticsearch_master'][0] }}"
+  shell: cat /etc/elasticsearch/elastic_credentials.txt || echo "Password not found in file"
+  register: elastic_credentials
+  changed_when: false
+  when: groups['elasticsearch_master'] is defined and groups['elasticsearch_master']|length > 0
+
+# Set the Elasticsearch password as a fact
+- name: Set Elasticsearch password as a fact
+  set_fact:
+    elastic_password: "{{ elastic_credentials.stdout | default('Password not found') }}"
+  when: elastic_credentials is defined and elastic_credentials.stdout is defined
+
 # Fetch Elasticsearch CA certificate from master node
 - name: Fetch Elasticsearch CA certificate from master node
   delegate_to: "{{ groups['elasticsearch_master'][0] }}"

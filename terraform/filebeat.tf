@@ -11,7 +11,7 @@ module "filebeat" {
   instance_name         = var.filebeat_instance_name
   instance_type         = var.filebeat_instance_type
   volume_size           = var.filebeat_volume_size
-  root_volume_type      = "gp3"
+  root_volume_type      = "gp2"
   delete_on_termination = false
   public_key            = var.public_key
 

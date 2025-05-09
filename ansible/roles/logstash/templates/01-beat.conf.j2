@@ -1,20 +1,20 @@
-input { 
-  beats { 
-    port => 5044 
-    ssl => true 
-  } 
-} 
-output { 
-   elasticsearch { 
+input {
+  beats {
+    port => 5044
+  }
+}
+output {
+   elasticsearch {
       hosts => [
         {% for host in groups['elasticsearch'] %}
         "https://{{ hostvars[host]['ansible_host'] | default(host) }}:9200"{% if not loop.last %},{% endif %}
         {% endfor %}
       ]
-      ssl => true 
-      cacert => "/etc/logstash/certs/http_ca.crt" 
-      index => "elk-syslog" 
-      api_key => "{{ logstash_api_key | default('CHANGEME') }}"
-      action => "create" 
-  } 
+      ssl => true
+      ssl_verification_mode => "none"
+      cacert => "/etc/logstash/certs/http_ca.crt"
+      index => "elk-syslog"
+      user => "elastic"
+      password => "{{ elastic_password }}"
+  }
 }

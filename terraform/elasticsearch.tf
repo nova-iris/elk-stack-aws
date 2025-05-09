@@ -12,7 +12,7 @@ module "elasticsearch" {
   instance_type         = var.instance_type
   instance_count        = var.instance_count
   volume_size           = var.volume_size
-  root_volume_type      = "gp3"
+  root_volume_type      = "gp2"
   delete_on_termination = false
   public_key            = var.public_key
 

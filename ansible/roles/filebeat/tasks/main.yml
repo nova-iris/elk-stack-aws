@@ -1,0 +1,98 @@
+---
+# Filebeat installation tasks
+
+- name: Download Filebeat package
+  get_url:
+    url: https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-9.0.0-amd64.deb
+    dest: /tmp/filebeat-9.0.0-amd64.deb
+    mode: '0644'
+  register: filebeat_downloaded
+
+- name: Install Filebeat package
+  apt:
+    deb: /tmp/filebeat-9.0.0-amd64.deb
+    state: present
+  when: filebeat_downloaded.changed
+
+# Create certificate directory for Filebeat
+- name: Create certificate directory for Filebeat
+  file:
+    path: /etc/filebeat/certs
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+# Fetch Elasticsearch CA certificate from master node
+- name: Fetch Elasticsearch CA certificate from master node
+  delegate_to: "{{ groups['elasticsearch_master'][0] }}"
+  fetch:
+    src: /etc/elasticsearch/certs/http_ca.crt
+    dest: /tmp/http_ca.crt
+    flat: yes
+  when: groups['elasticsearch_master'] is defined and groups['elasticsearch_master']|length > 0
+
+# Deploy Elasticsearch CA certificate to Filebeat
+- name: Copy Elasticsearch CA certificate to Filebeat
+  copy:
+    src: /tmp/http_ca.crt
+    dest: /etc/filebeat/certs/http_ca.crt
+    owner: root
+    group: root
+    mode: '0640'
+  notify: restart filebeat
+
+# Enable the system module
+- name: Enable Filebeat system module
+  shell: filebeat modules enable system
+  register: module_enable_result
+  changed_when: "'Enabled system' in module_enable_result.stdout"
+  failed_when: module_enable_result.rc != 0
+  notify: restart filebeat
+
+# Deploy custom system.yml configuration
+- name: Deploy custom system module configuration
+  template:
+    src: system.yml.j2
+    dest: /etc/filebeat/modules.d/system.yml
+    owner: root
+    group: root
+    mode: '0640'
+  notify: restart filebeat
+
+# Comment out elasticsearch output in filebeat.yml
+- name: Comment out elasticsearch output in filebeat.yml
+  lineinfile:
+    path: /etc/filebeat/filebeat.yml
+    regexp: '^(\s*)output.elasticsearch:'
+    line: '#output.elasticsearch:'
+    backrefs: yes
+  notify: restart filebeat
+
+- name: Comment out elasticsearch hosts in filebeat.yml
+  lineinfile:
+    path: /etc/filebeat/filebeat.yml
+    regexp: '^(\s*)hosts:'
+    line: '  #hosts: ["localhost:9200"]'
+    backrefs: yes
+  notify: restart filebeat
+
+# Add logstash output to filebeat.yml
+- name: Set logstash output in filebeat.yml
+  blockinfile:
+    path: /etc/filebeat/filebeat.yml
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - LOGSTASH OUTPUT"
+    block: |
+      output.logstash:
+        # The Logstash hosts
+        hosts: [{% for host in groups['logstash'] %}"{{ hostvars[host]['ansible_host'] | default(host) }}:5044"{% if not loop.last %},{% endif %}{% endfor %}]
+        # ssl.enabled: true
+        # ssl.certificate_authorities: ["/etc/filebeat/certs/http_ca.crt"]
+  notify: restart filebeat
+
+# Enable and start Filebeat service
+- name: Enable and start Filebeat service
+  systemd:
+    name: filebeat
+    enabled: yes
+    state: started
