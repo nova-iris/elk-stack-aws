@@ -19,7 +19,7 @@ public_key                = "<PATH_TO_PUBLIC_KEY>"  # Optional: SSH key path
 volume_size               = 100  # Recommended at least 100GB for Elasticsearch
 
 # Elasticsearch Configuration
-elasticsearch_version = "7.10.2"
+elasticsearch_version = "8.18.0"
 cluster_name         = "elk-cluster"
 enable_ui            = true  # Set to true to install Kibana alongside Elasticsearch
 
