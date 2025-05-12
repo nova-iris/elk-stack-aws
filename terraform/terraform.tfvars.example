@@ -35,3 +35,13 @@ filebeat_volume_size   = 20  # Volume size in GB for Filebeat instance
 
 # Environment
 environment = "dev"
+
+# S3 Backup Configuration
+es_use_s3_backups = true
+es_backup_force_destroy = false
+es_backup_enable_versioning = true
+es_backup_enable_lifecycle = true
+es_backup_prefix = "elasticsearch/"
+es_backup_transition_to_ia_days = 30
+es_backup_transition_to_glacier_days = 90
+es_backup_expiration_days = 365

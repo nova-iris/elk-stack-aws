@@ -95,3 +95,19 @@ output "ssh_to_filebeat" {
   description = "SSH command to connect to the Filebeat instance"
   value       = var.associate_public_ip_address ? "ssh ubuntu@${module.filebeat.public_ip}" : "ssh ubuntu@${module.filebeat.private_ip}"
 }
+
+# S3 Backup outputs
+output "elasticsearch_backup_bucket" {
+  description = "Name of the S3 bucket for Elasticsearch backups"
+  value       = var.es_use_s3_backups ? module.elasticsearch_backup[0].bucket_id : "S3 backups not enabled"
+}
+
+output "elasticsearch_backup_bucket_arn" {
+  description = "ARN of the S3 bucket for Elasticsearch backups"
+  value       = var.es_use_s3_backups ? module.elasticsearch_backup[0].bucket_arn : "S3 backups not enabled"
+}
+
+output "elasticsearch_backup_role_arn" {
+  description = "ARN of the IAM role for Elasticsearch S3 access"
+  value       = var.es_use_s3_backups ? module.elasticsearch_backup[0].role_arn : "S3 backups not enabled"
+}

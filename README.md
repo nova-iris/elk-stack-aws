@@ -141,6 +141,35 @@ To retrieve the Elasticsearch password:
 ssh ubuntu@<elasticsearch_master_ip> -i /path/to/your/key 'sudo cat /etc/elasticsearch/elastic_credentials.txt'
 ```
 
+## S3 Backup Configuration
+
+The stack supports configuring S3 buckets for Elasticsearch snapshots and backups:
+
+1. By default, S3 bucket creation is enabled (`es_use_s3_backups = true`)
+2. The S3 bucket is configured with lifecycle policies for efficient storage management
+3. IAM roles and policies are automatically created and attached to Elasticsearch instances
+
+To disable S3 backup infrastructure, set `es_use_s3_backups = false` in your `terraform.tfvars` file.
+
+### Configuring Elasticsearch for S3 Repository
+
+After the infrastructure is deployed, you need to register the S3 repository in Elasticsearch:
+
+```bash
+# SSH into the master Elasticsearch node
+ssh ubuntu@<elasticsearch_master_ip>
+
+# Register the S3 repository (replace with your actual values)
+curl -X PUT "localhost:9200/_snapshot/s3_repository" -H "Content-Type: application/json" -d'
+{
+  "type": "s3",
+  "settings": {
+    "bucket": "<your-bucket-name>",
+    "region": "<aws-region>"
+  }
+}'
+```
+
 ## Updating the Stack
 
 To make changes to your ELK Stack configuration:
