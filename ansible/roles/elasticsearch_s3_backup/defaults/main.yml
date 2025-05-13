@@ -13,11 +13,11 @@ elastic_username: "elastic"      # Default Elasticsearch username
 
 # Elasticsearch repository settings
 repository_name: "my_s3_repo"    # Repository name used in API calls
-snapshot_schedule: "0 0 1 * * ?" # Daily at 1 AM (cron format) - exactly as in working script
+snapshot_schedule: "0 */15 * * * ?" # Run every 2 minutes for testing (cron format)
 snapshot_name_prefix: "daily-snap" # Prefix for snapshot names
 snapshot_retention_days: "14d"   # Keep snapshots for 14 days - exactly as in working script
 snapshot_min_count: 5            # Keep at least 5 snapshots - exactly as in working script
 snapshot_max_count: 30           # Keep at most 30 snapshots - exactly as in working script
 
 # Execution control
-trigger_manual_snapshot: true    # Whether to trigger a manual snapshot after setup
+trigger_manual_snapshot: false    # Whether to trigger a manual snapshot after setup
