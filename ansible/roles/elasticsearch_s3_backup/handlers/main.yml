@@ -1,0 +1,30 @@
+---
+# Handlers for Elasticsearch S3 backup role
+
+- name: restart elasticsearch
+  block:
+    - name: Stop Elasticsearch service
+      systemd:
+        name: elasticsearch
+        state: stopped
+      register: es_stop
+      retries: 2
+      delay: 5
+      until: es_stop is success
+      
+    - name: Wait for Elasticsearch to fully stop
+      pause:
+        seconds: 10
+        
+    - name: Start Elasticsearch service
+      systemd:
+        name: elasticsearch
+        state: started
+      register: es_start
+      retries: 3
+      delay: 10
+      until: es_start is success
+  rescue:
+    - name: Log restart failure
+      debug:
+        msg: "Failed to restart Elasticsearch cleanly. Will continue with tasks."

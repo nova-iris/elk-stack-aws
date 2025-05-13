@@ -9,6 +9,14 @@
   tags:
     - elasticsearch
 
+- name: Configure Elasticsearch S3 backups
+  hosts: elasticsearch_master
+  become: yes
+  roles:
+    - role: elasticsearch_s3_backup
+  tags:
+    - s3_backup
+
 - name: Install and configure Kibana on master nodes
   hosts: elasticsearch_master
   become: yes

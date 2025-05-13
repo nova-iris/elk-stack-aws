@@ -17,7 +17,7 @@ module "elasticsearch" {
   public_key            = var.public_key
 
   # IAM Instance Profile for S3 backup access
-  iam_instance_profile = var.es_use_s3_backups ? module.elasticsearch_backup[0].instance_profile_name : null
+  iam_instance_profile = var.es_use_s3_backups ? aws_iam_instance_profile.elasticsearch_profile[0].name : null
 
   # Security Configuration - Custom ports for Elasticsearch
   security_group_name          = "elasticsearch-sg-${var.environment}"

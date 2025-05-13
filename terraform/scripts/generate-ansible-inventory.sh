@@ -61,6 +61,9 @@ ansible_ssh_private_key_file=~/.ssh/id_ed25519
 elasticsearch_cluster_name=${CLUSTER_NAME:-elk-cluster}
 elasticsearch_version=${ES_VERSION:-7.10.2}
 enable_kibana=${ENABLE_UI:-true}
+es_use_s3_backups=${ES_USE_S3_BACKUPS:-true}
+s3_bucket_name=${S3_BUCKET_NAME}
+aws_region=${AWS_REGION:-us-east-1}
 
 [logstash:vars]
 ansible_ssh_private_key_file=~/.ssh/id_ed25519

@@ -148,26 +148,73 @@ The stack supports configuring S3 buckets for Elasticsearch snapshots and backup
 1. By default, S3 bucket creation is enabled (`es_use_s3_backups = true`)
 2. The S3 bucket is configured with lifecycle policies for efficient storage management
 3. IAM roles and policies are automatically created and attached to Elasticsearch instances
+4. Automated daily snapshots are configured to run at midnight
 
 To disable S3 backup infrastructure, set `es_use_s3_backups = false` in your `terraform.tfvars` file.
 
-### Configuring Elasticsearch for S3 Repository
+### Automated Backup Configuration
 
-After the infrastructure is deployed, you need to register the S3 repository in Elasticsearch:
+The ELK Stack is configured with the following automated backup settings:
+
+1. **Repository Plugin**: The S3 repository plugin is automatically installed on all Elasticsearch nodes
+2. **AWS Credentials**: IAM instance profiles are used for secure, no-credential access to S3
+3. **Snapshot Schedule**: Snapshots are taken daily at midnight
+4. **Snapshot Contents**: Each snapshot includes all indices and the global cluster state
+5. **Retention Policy**: Snapshots are retained for 30 days, with a minimum of 5 and maximum of 50 snapshots
+
+### Manual Snapshot Management
+
+You can manually manage snapshots using the Elasticsearch API:
 
 ```bash
 # SSH into the master Elasticsearch node
 ssh ubuntu@<elasticsearch_master_ip>
 
-# Register the S3 repository (replace with your actual values)
-curl -X PUT "localhost:9200/_snapshot/s3_repository" -H "Content-Type: application/json" -d'
-{
-  "type": "s3",
-  "settings": {
-    "bucket": "<your-bucket-name>",
-    "region": "<aws-region>"
-  }
-}'
+# Create a manual snapshot
+curl -X PUT "http://localhost:9200/_snapshot/s3_repository/manual_snapshot?wait_for_completion=true" \
+     -H "Content-Type: application/json" -u elastic:YOUR_PASSWORD
+
+# List all snapshots
+curl -X GET "http://localhost:9200/_snapshot/s3_repository/_all" -u elastic:YOUR_PASSWORD
+
+# Restore a snapshot
+curl -X POST "http://localhost:9200/_snapshot/s3_repository/snapshot_name/_restore" \
+     -H "Content-Type: application/json" -u elastic:YOUR_PASSWORD
+```
+
+### Customizing Backup Settings
+
+To modify the backup configuration (schedule, retention, etc.):
+
+1. Edit `/d/repos/nova-iris/elk-stack-setup/ansible/roles/elasticsearch_s3_backup/defaults/main.yml` 
+2. Re-run the deployment script with the Ansible-only option:
+   ```bash
+   ./deploy-elk-stack.sh -a
+   ```
+
+### Running Only S3 Backup Configuration
+
+If you want to run only the S3 backup configuration without deploying other components:
+
+#### Option 1: Using Tag with install-elk.yml
+
+```bash
+cd /d/repos/nova-iris/elk-stack-setup/ansible
+ansible-playbook install-elk.yml -t s3_backup
+```
+
+#### Option 2: Using Dedicated S3 Backup Playbook
+
+```bash
+cd /d/repos/nova-iris/elk-stack-setup/ansible
+ansible-playbook s3-backup.yml
+```
+
+#### Option 3: Using deploy-elk-stack.sh with Tag
+
+```bash
+cd /d/repos/nova-iris/elk-stack-setup
+./deploy-elk-stack.sh -a -t s3_backup
 ```
 
 ## Updating the Stack
