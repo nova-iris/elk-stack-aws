@@ -145,15 +145,10 @@
 # Trigger snapshot manually if requested
 - name: Execute snapshot manually
   uri:
-    url: "https://{{ elasticsearch_host }}:9200/_snapshot/{{ repository_name }}/manual-trigger-{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}"
-    method: PUT
+    url: "https://{{ elasticsearch_host }}:9200/_slm/policy/daily-snapshots/_execute"
+    method: POST
     user: "{{ elastic_username }}"
     password: "{{ elastic_password }}"
-    body_format: json
-    body:
-      indices: "*"
-      ignore_unavailable: true
-      include_global_state: false
     validate_certs: no
     status_code: 200
   when: trigger_manual_snapshot | bool
