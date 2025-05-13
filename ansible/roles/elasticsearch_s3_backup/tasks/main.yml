@@ -1,0 +1,174 @@
+---
+# Main tasks for Elasticsearch S3 backup configuration
+
+# Debug: Print all important variables
+- name: Debug - Print all variables
+  debug:
+    msg:
+      - "es_use_s3_backups: {{ es_use_s3_backups | default('undefined') }}"
+      - "aws_region: {{ aws_region | default('undefined') }}"
+      - "s3_bucket_name: {{ s3_bucket_name | default('undefined') }}"
+      - "elastic_username: {{ elastic_username | default('undefined') }}"
+      - "repository_name: {{ repository_name | default('undefined') }}"
+      - "snapshot_schedule: {{ snapshot_schedule | default('undefined') }}"
+      - "snapshot_name_prefix: {{ snapshot_name_prefix | default('undefined') }}"
+      - "snapshot_retention_days: {{ snapshot_retention_days | default('undefined') }}"
+      - "snapshot_min_count: {{ snapshot_min_count | default('undefined') }}"
+      - "snapshot_max_count: {{ snapshot_max_count | default('undefined') }}"
+      - "trigger_manual_snapshot: {{ trigger_manual_snapshot | default('undefined') }}"
+      - "ansible_default_ipv4.address: {{ ansible_default_ipv4.address | default('undefined') }}"
+  when: es_use_s3_backups | bool
+  tags: s3_backup
+
+# Set elasticsearch_host to the private IP of the current node
+- name: Set elasticsearch_host to private IP 
+  set_fact:
+    elasticsearch_host: "{{ ansible_default_ipv4.address }}"
+  when: es_use_s3_backups | bool
+  tags: s3_backup
+
+# Debug: Print elasticsearch_host after setting
+- name: Debug - Print elasticsearch_host after setting
+  debug:
+    msg: "elasticsearch_host (after setting): {{ elasticsearch_host }}"
+  when: es_use_s3_backups | bool
+  tags: s3_backup
+
+# Ensure elastic_password is available
+- name: Read Elasticsearch credentials from file
+  shell: cat /etc/elasticsearch/elastic_credentials.txt
+  register: elastic_credentials
+  changed_when: false
+  when: 
+    - es_use_s3_backups | bool
+    - not (elastic_password is defined)
+  tags: s3_backup
+
+- name: Set Elasticsearch password as a fact
+  set_fact:
+    elastic_password: "{{ elastic_credentials.stdout | default('changeme') }}"
+  when: 
+    - es_use_s3_backups | bool
+    - elastic_credentials is defined and elastic_credentials.stdout is defined
+    - not (elastic_password is defined)
+  tags: s3_backup
+
+# Check that the S3 module is present
+- name: Check if repository-s3 module is installed
+  command: ls /usr/share/elasticsearch/modules/repository-s3
+  register: s3_module_check
+  failed_when: false
+  changed_when: false
+  tags: s3_backup
+
+- name: Fail if S3 plugin is not installed
+  fail:
+    msg: "Elasticsearch S3 plugin is not installed. Please install it using: bin/elasticsearch-plugin install repository-s3"
+  when: s3_module_check.rc != 0
+  tags: s3_backup
+
+# Register S3 backup repository
+- name: Register S3 repository with Elasticsearch
+  uri:
+    url: "https://{{ elasticsearch_host }}:9200/_snapshot/{{ repository_name }}"
+    method: PUT
+    user: "{{ elastic_username }}"
+    password: "{{ elastic_password }}"
+    body_format: json
+    body:
+      type: s3
+      settings:
+        bucket: "{{ s3_bucket_name }}"
+        region: "{{ aws_region | default('us-east-1') }}"
+    validate_certs: no
+    status_code: 200,201
+  register: register_repo_result
+  changed_when: register_repo_result.status == 200 or register_repo_result.status == 201
+  tags: s3_backup
+
+# Verify S3 repository configuration
+- name: Verify S3 repository configuration
+  uri:
+    url: "https://{{ elasticsearch_host }}:9200/_snapshot/{{ repository_name }}?pretty"
+    method: GET
+    user: "{{ elastic_username }}"
+    password: "{{ elastic_password }}"
+    validate_certs: no
+    status_code: 200
+  register: verify_repo
+  tags: s3_backup
+
+# Display repository configuration
+- name: Display repository configuration
+  debug:
+    var: verify_repo.json
+  tags: s3_backup
+
+# Check Elasticsearch license
+- name: Check Elasticsearch license
+  uri:
+    url: "https://{{ elasticsearch_host }}:9200/_license"
+    method: GET
+    user: "{{ elastic_username }}"
+    password: "{{ elastic_password }}"
+    validate_certs: no
+    status_code: 200
+  register: license_check
+  tags: s3_backup
+
+# Define Snapshot Lifecycle Policy
+- name: Configure Snapshot Lifecycle Management policy
+  uri:
+    url: "https://{{ elasticsearch_host }}:9200/_slm/policy/daily-snapshots"
+    method: PUT
+    user: "{{ elastic_username }}"
+    password: "{{ elastic_password }}"
+    body_format: json
+    body:
+      schedule: "{{ snapshot_schedule }}"
+      name: "<{{ snapshot_name_prefix }}-{now/d}>"
+      repository: "{{ repository_name }}"
+      config:
+        indices: ["*"]
+        ignore_unavailable: true
+        include_global_state: false
+      retention:
+        expire_after: "{{ snapshot_retention_days }}"
+        min_count: "{{ snapshot_min_count }}"
+        max_count: "{{ snapshot_max_count }}"
+    validate_certs: no
+    status_code: 200,201
+  register: slm_policy_result
+  changed_when: slm_policy_result.status == 200 or slm_policy_result.status == 201
+  tags: s3_backup
+
+# Trigger snapshot manually if requested
+- name: Execute snapshot manually
+  uri:
+    url: "https://{{ elasticsearch_host }}:9200/_slm/policy/daily-snapshots/_execute"
+    method: POST
+    user: "{{ elastic_username }}"
+    password: "{{ elastic_password }}"
+    validate_certs: no
+    status_code: 200
+  when: trigger_manual_snapshot | bool
+  register: manual_snapshot
+  tags: s3_backup
+
+# List all snapshots in repository
+- name: List all snapshots in repository
+  uri:
+    url: "https://{{ elasticsearch_host }}:9200/_snapshot/{{ repository_name }}/_all?pretty"
+    method: GET
+    user: "{{ elastic_username }}"
+    password: "{{ elastic_password }}"
+    validate_certs: no
+    status_code: 200
+  register: snapshots_list
+  tags: s3_backup
+
+# Display snapshots if any exist
+- name: Display snapshots information
+  debug:
+    var: snapshots_list.json
+  tags: s3_backup

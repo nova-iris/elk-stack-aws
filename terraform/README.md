@@ -1,30 +1,8 @@
-# ELK Stack Terraform Infrastructure
+# Terraform Configuration for ELK Stack
 
-This directory contains Terraform configurations to deploy a complete Elastic Stack (ELK) in AWS. The infrastructure consists of:
+This directory contains the Terraform configurations for deploying ELK Stack infrastructure in AWS. These configurations focus on creating the necessary cloud infrastructure components, which are then configured by Ansible playbooks in a separate step.
 
-- Elasticsearch nodes (configurable cluster size)
-- Logstash instance for data processing
-- Filebeat instance for log collection
-- VPC networking with public/private subnets (or option to use existing VPC)
-- Security groups with proper port configurations
-- Automatic generation of Ansible inventory for configuration management
-
-## Prerequisites
-
-Before you begin, ensure you have:
-
-1. [Terraform](https://www.terraform.io/downloads.html) (v1.0.0 or higher) installed
-2. AWS credentials configured on your system (via AWS CLI, environment variables, or credential files)
-3. SSH key pair for accessing the instances
-
-## Deployment Options
-
-There are two ways to deploy the ELK stack:
-
-1. **Terraform Only**: Use Terraform to provision the infrastructure only.
-2. **Complete Deployment**: Use the `deploy-elk-stack.sh` script to provision infrastructure with Terraform and configure the ELK stack with Ansible in one step.
-
-## Directory Structure
+## Terraform Files Overview
 
 ```
 terraform/
@@ -36,188 +14,190 @@ terraform/
 ├── elasticsearch.tf        # Elasticsearch instance configuration
 ├── logstash.tf             # Logstash instance configuration
 ├── filebeat.tf             # Filebeat instance configuration
+├── s3_backup.tf            # S3 backup configuration
+├── backup_variables.tf     # Backup-specific variables
 ├── data.tf                 # Data sources
 ├── terraform.tfvars        # Variable values (create from example file)
-├── terraform.tfvars.example # Example variable values
 └── modules/                # Reusable modules
     ├── vpc/                # VPC module
-    └── ec2/                # EC2 instance module
+    ├── ec2/                # EC2 instance module
+    └── s3/                 # S3 module
 ```
 
-## Setup Instructions
+## Manual Terraform Deployment
 
-### 1. Initialize Configuration
+For DevOps engineers who want to directly control the Terraform deployment without using the deploy script, follow these steps:
 
-Clone this repository and navigate to the terraform directory:
-
-```bash
-cd /path/to/elk-stack-setup/terraform
-```
+### 1. Configure Variables
 
 Create your `terraform.tfvars` file from the example:
 
 ```bash
+cd /d/repos/nova-iris/elk-stack-setup/terraform
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Edit `terraform.tfvars` to customize your deployment. Important settings include:
+Edit `terraform.tfvars` with your configuration:
 
-- AWS region
-- VPC configuration (create new or use existing)
-- Instance types and sizes
-- Cluster configuration
-- SSH key location
-- Environment name
+```bash
+nano terraform.tfvars
+```
 
-### 2. Initialize Terraform
+Key variables to configure:
 
-Initialize the Terraform workspace:
+```hcl
+# AWS Region
+region = "us-west-2"
+
+# Environment name (used for resource naming)
+environment = "production"
+
+# VPC Configuration
+create_new_vpc = true
+vpc_cidr = "10.0.0.0/16"
+
+# Instance Configuration
+elasticsearch_instance_type = "t3.medium"
+logstash_instance_type = "t3.medium"
+filebeat_instance_type = "t3.small"
+
+# Cluster Configuration
+elasticsearch_master_count = 1
+elasticsearch_data_count = 2
+
+# SSH Key
+ssh_key_name = "elk-stack-key"
+```
+
+### 2. Initialize and Apply
+
+Initialize Terraform (only needed once or after module changes):
 
 ```bash
 terraform init
 ```
 
-This will download the required providers and modules.
-
-### 3. Preview Changes
-
-Generate an execution plan to preview the changes:
+Apply the configuration:
 
 ```bash
 terraform plan -out=tfplan
+terraform apply -auto-approve
 ```
 
-Review the changes to ensure they match your expectations.
+### 3. Generate Ansible Inventory
 
-### 4. Apply Configuration
-
-Apply the Terraform configuration to create the infrastructure:
+After successful deployment, generate the Ansible inventory file:
 
 ```bash
-terraform apply tfplan
+cd /d/repos/nova-iris/elk-stack-setup/terraform/scripts
+./generate-ansible-inventory.sh
 ```
 
-Or directly apply without a saved plan:
+This will create an inventory file at `../ansible/inventory/elk.ini` for use with Ansible.
 
-```bash
-terraform apply
-```
+## Important Configuration Options
 
-The infrastructure creation will take several minutes. Once complete, Terraform will output connection information for your instances.
+### VPC Options
 
-### 5. Access Your Instances
+- **Create New VPC**: Set `create_new_vpc = true` to create a new VPC
+- **Use Existing VPC**: Set `create_new_vpc = false` and provide `vpc_id` and subnet IDs
 
-After deployment, you can access your instances using SSH:
+### Elasticsearch Cluster Configuration
 
-```bash
-ssh -i /path/to/key.pem ubuntu@<instance_public_ip>
-```
+- `elasticsearch_master_count`: Number of dedicated master nodes
+- `elasticsearch_data_count`: Number of data nodes
+- `elasticsearch_instance_type`: Instance type for Elasticsearch nodes
 
-The public IPs are provided in the Terraform outputs.
+### S3 Backup Configuration
 
-## Running with deploy-elk-stack.sh
-
-For a complete deployment that includes both infrastructure provisioning and configuration, you can use the `deploy-elk-stack.sh` script from the root directory:
-
-```bash
-cd /path/to/elk-stack-setup/
-./deploy-elk-stack.sh
-```
-
-This script will:
-
-1. Run `terraform init` and `terraform apply` to provision the AWS infrastructure
-2. Generate the Ansible inventory file
-3. Run Ansible playbooks to install and configure the ELK stack components
-4. Verify the deployment
-
-### Script Options
-
-The `deploy-elk-stack.sh` script accepts several options:
-
-```bash
-./deploy-elk-stack.sh [-t] [-a] [-h]
-```
-
-- `-t`: Run Terraform only (no Ansible configuration)
-- `-a`: Run Ansible only (assumes infrastructure exists)
-- `-h`: Show help message
-
-Example for Terraform-only deployment:
-```bash
-./deploy-elk-stack.sh -t
-```
+- `es_use_s3_backups`: Enable/disable S3 backup infrastructure
+- `s3_bucket_name`: Name for the S3 bucket (defaults to auto-generated name)
+- `s3_backup_retention_days`: Number of days to retain backups
 
 ## Common Operations
 
-### Updating Infrastructure
+### Apply Changes
 
-To make changes to the infrastructure:
+To update the existing infrastructure:
 
-1. Edit `terraform.tfvars` with your desired changes
-2. Run `terraform plan -out=tfplan` to see what would change
-3. Apply the changes with `terraform apply tfplan`
+```bash
+cd /d/repos/nova-iris/elk-stack-setup/terraform
+terraform plan -out=tfplan
+terraform apply -auto-approve
+```
 
-### Refreshing State
+### Refresh State
 
-To update the Terraform state with the current real infrastructure:
+To sync Terraform state with actual AWS resources:
 
 ```bash
 terraform refresh
 ```
 
-### Showing Current Resources
-
-To see the managed resources and their attributes:
+### Examine State
 
 ```bash
+# List all resources
 terraform state list
-terraform state show <resource_name>
+
+# Show details of a specific resource
+terraform state show aws_instance.elasticsearch_master[0]
 ```
 
-## Destroying Infrastructure
+### Target Specific Resources
 
-To destroy all resources created by this Terraform configuration:
+Apply changes to specific resources:
 
 ```bash
-terraform destroy
+terraform apply -target=module.vpc -auto-approve
 ```
 
-You'll be asked to confirm before proceeding. This action is irreversible and will delete all created resources.
+### Destroy Infrastructure
 
-For a more targeted approach, you can destroy specific resources:
+To remove all infrastructure:
 
 ```bash
-terraform destroy -target=module.filebeat
+terraform destroy -auto-approve
 ```
 
-## Additional Information
-
-- The infrastructure is designed to work with the Ansible playbooks in the `../ansible` directory
-- After Terraform successfully deploys, an Ansible inventory file is automatically generated at `../ansible/inventory/elk.ini`
-- For a complete deployment, run the `../deploy-elk-stack.sh` script which combines both Terraform and Ansible steps
-
-## Troubleshooting
-
-Common issues:
-
-1. **AWS credentials not found**: Ensure your AWS credentials are properly configured
-2. **Resources not being created**: Check for limits in your AWS account
-3. **VPC errors**: If using existing VPC/subnets, verify their IDs and availability 
-4. **SSH connection issues**: Verify security group rules and key pairs
-
-For more detailed troubleshooting, check the Terraform logs by setting the environment variable:
+To destroy specific components:
 
 ```bash
-export TF_LOG=DEBUG
-terraform apply
+terraform destroy -target=aws_instance.logstash -auto-approve
 ```
 
-## Contributing
+## Remote State Management (Advanced)
 
-When adding new features or making changes to this Terraform code:
+To implement remote state storage in S3 with locking, add to `providers.tf`:
 
-1. Create a new branch for your changes
-2. Test thoroughly before merging
-3. Update this README with any new variables or important information
-4. Consider adding examples for common use cases
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "your-terraform-state-bucket"
+    key            = "elk-stack/terraform.tfstate"
+    region         = "us-west-2"
+    dynamodb_table = "terraform-locks"
+    encrypt        = true
+  }
+}
+```
+
+## Performance Tuning
+
+For larger Elasticsearch clusters or production environments, consider:
+
+1. Adjusting instance types in `terraform.tfvars`:
+   ```hcl
+   elasticsearch_instance_type = "r5.xlarge"
+   ```
+
+2. Enabling advanced monitoring:
+   ```hcl
+   enable_detailed_monitoring = true
+   ```
+
+3. Using dedicated EBS volumes for data:
+   ```hcl
+   elasticsearch_data_volume_size = 100
+   elasticsearch_data_volume_type = "gp3"
+   ```

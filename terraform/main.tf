@@ -55,9 +55,13 @@ resource "local_file" "ansible_inventory" {
         AnsibleManaged = "true"
       }
     },
-    cluster_name          = var.cluster_name,
-    elasticsearch_version = var.elasticsearch_version,
-    enable_ui             = var.enable_ui
+    cluster_name                = var.cluster_name,
+    elasticsearch_version       = var.elasticsearch_version,
+    enable_ui                   = var.enable_ui,
+    es_use_s3_backups           = var.es_use_s3_backups,
+    environment                 = var.environment,
+    aws_region                  = var.aws_region,
+    elasticsearch_backup_bucket = var.es_use_s3_backups ? module.elasticsearch_backup[0].bucket_id : ""
   })
   filename = "${path.module}/../ansible/inventory/elk.ini"
 

@@ -11,6 +11,24 @@ The deployed ELK Stack consists of:
 - **Kibana**: Data visualization dashboard for Elasticsearch
 - **Filebeat**: Lightweight log shipper for forwarding logs
 
+### Architecture Diagram
+
+Below is the architecture diagram of the ELK Stack deployment in AWS:
+
+![ELK Stack Architecture Diagram](./ELK_Diagram.png)
+
+The diagram illustrates how the different components of the ELK Stack are deployed across AWS EC2 instances within a VPC. The architecture includes:
+
+- Elasticsearch cluster with dedicated master and data nodes for scalability and resilience
+- Logstash instances for processing and transforming data
+- Kibana server for data visualization and management
+- Filebeat instances for collecting and forwarding log files
+- S3 bucket for Elasticsearch snapshots and backups
+- Appropriate security groups controlling access between components
+- Network configuration with public and private subnets
+
+This architecture provides a scalable and resilient logging and analytics infrastructure, with automated backup capabilities to S3.
+
 ## Directory Structure
 
 ```
@@ -36,7 +54,6 @@ Before beginning deployment, ensure you have:
 3. **Ansible**: Version 2.9 or higher installed
 4. **SSH Key Pair**: For accessing the instances
 5. **AWS CLI** (optional): Configured with valid credentials
-6. **jq**: For JSON parsing in scripts
 
 ## Deployment Options
 
@@ -83,6 +100,9 @@ This script will:
 Examples:
 
 ```bash
+# Deploy all (Terraform + Ansible)
+./deploy-elk-stack.sh
+
 # Deploy only Elasticsearch and Kibana components
 ./deploy-elk-stack.sh -t elasticsearch,kibana
 
@@ -141,6 +161,68 @@ To retrieve the Elasticsearch password:
 ssh ubuntu@<elasticsearch_master_ip> -i /path/to/your/key 'sudo cat /etc/elasticsearch/elastic_credentials.txt'
 ```
 
+## S3 Backup Configuration
+
+The stack supports configuring S3 buckets for Elasticsearch snapshots and backups:
+
+1. By default, S3 bucket creation is enabled (`es_use_s3_backups = true`)
+2. The S3 bucket is configured with lifecycle policies for efficient storage management
+3. IAM roles and policies are automatically created and attached to Elasticsearch instances
+4. Automated daily snapshots are configured to run at midnight
+
+To disable S3 backup infrastructure, set `es_use_s3_backups = false` in your `terraform.tfvars` file.
+
+### Automated Backup Configuration
+
+The ELK Stack is configured with the following automated backup settings:
+
+1. **Repository Plugin**: The S3 repository plugin is automatically installed on all Elasticsearch nodes
+2. **AWS Credentials**: IAM instance profiles are used for secure, no-credential access to S3
+3. **Snapshot Schedule**: Snapshots are taken daily at midnight
+4. **Snapshot Contents**: Each snapshot includes all indices and the global cluster state
+5. **Retention Policy**: Snapshots are retained for 30 days, with a minimum of 5 and maximum of 50 snapshots
+
+### Manual Snapshot Management
+
+You can manually manage snapshots using the Elasticsearch API:
+
+```bash
+# SSH into the master Elasticsearch node
+ssh ubuntu@<elasticsearch_master_ip>
+
+# Create a manual snapshot
+curl -X PUT "http://localhost:9200/_snapshot/s3_repository/manual_snapshot?wait_for_completion=true" \
+     -H "Content-Type: application/json" -u elastic:YOUR_PASSWORD
+
+# List all snapshots
+curl -X GET "http://localhost:9200/_snapshot/s3_repository/_all" -u elastic:YOUR_PASSWORD
+
+# Restore a snapshot
+curl -X POST "http://localhost:9200/_snapshot/s3_repository/snapshot_name/_restore" \
+     -H "Content-Type: application/json" -u elastic:YOUR_PASSWORD
+```
+
+### Customizing Backup Settings
+
+To modify the backup configuration (schedule, retention, etc.):
+
+1. Edit `/d/repos/nova-iris/elk-stack-setup/ansible/roles/elasticsearch_s3_backup/defaults/main.yml` 
+2. Running Only S3 Backup Configuration
+
+#### Option 1: Using Tag with install-elk.yml
+
+```bash
+cd /d/repos/nova-iris/elk-stack-setup/ansible
+ansible-playbook install-elk.yml -t s3_backup
+```
+
+#### Option 2: Using deploy-elk-stack.sh with Tag
+
+```bash
+cd /d/repos/nova-iris/elk-stack-setup
+./deploy-elk-stack.sh -a -t s3_backup
+```
+
 ## Updating the Stack
 
 To make changes to your ELK Stack configuration:
@@ -166,18 +248,3 @@ Common issues:
 2. **Elasticsearch Cluster Formation**: Check network settings and discovery configuration
 3. **Ansible Errors**: Verify the inventory file was properly generated
 4. **AWS Resource Limits**: Ensure your account has sufficient capacity
-
-For detailed logs:
-
-```bash
-export TF_LOG=DEBUG
-terraform apply -auto-approve
-```
-
-## Contributing
-
-When contributing to this project:
-
-1. Create a new branch for your changes
-2. Test thoroughly before merging
-3. Update documentation with any new features or important information

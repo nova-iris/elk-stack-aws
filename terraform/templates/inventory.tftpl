@@ -36,6 +36,9 @@ ansible_python_interpreter=/usr/bin/python3
 elasticsearch_cluster_name=${cluster_name}
 elasticsearch_version=${elasticsearch_version}
 enable_kibana=${enable_ui ? "true" : "false"}
+es_use_s3_backups=${es_use_s3_backups ? "true" : "false"}
+s3_bucket_name=${elasticsearch_backup_bucket} 
+aws_region=${aws_region}
 
 [logstash:vars]
 ansible_ssh_private_key_file=~/.ssh/id_ed25519

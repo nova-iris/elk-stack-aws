@@ -1,0 +1,23 @@
+---
+# Default variables for Elasticsearch S3 backup role
+
+# S3 backup configuration
+# Note: These defaults are overridden by values passed from Terraform
+es_use_s3_backups: false
+aws_region: "us-east-1"
+# s3_bucket_name should be provided by Terraform
+
+# Elasticsearch connection settings
+elasticsearch_host: "localhost"  # Can be overridden by Terraform output
+elastic_username: "elastic"      # Default Elasticsearch username
+
+# Elasticsearch repository settings
+repository_name: "my_s3_repo"    # Repository name used in API calls
+snapshot_schedule: "0 0 1 * * ?" # Run daily at 1:00AM (cron format)
+snapshot_name_prefix: "daily-snap" # Prefix for snapshot names
+snapshot_retention_days: "14d"   # Keep snapshots for 14 days - exactly as in working script
+snapshot_min_count: 5            # Keep at least 5 snapshots - exactly as in working script
+snapshot_max_count: 30           # Keep at most 30 snapshots - exactly as in working script
+
+# Execution control
+trigger_manual_snapshot: true    # Whether to trigger a manual snapshot after setup
