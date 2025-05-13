@@ -40,33 +40,44 @@ cp terraform.tfvars.example terraform.tfvars
 Edit `terraform.tfvars` with your configuration:
 
 ```bash
-nano terraform.tfvars
+vi terraform.tfvars
 ```
 
 Key variables to configure:
 
 ```hcl
-# AWS Region
-region = "us-west-2"
-
-# Environment name (used for resource naming)
-environment = "production"
+# AWS Configuration
+aws_region     = "us-east-1"     # e.g., us-east-1, us-west-2
+aws_account_id = "123456789012"  # Your AWS Account ID
+access_key     = "YOUR_ACCESS_KEY"
+secret_key     = "YOUR_SECRET_KEY"
 
 # VPC Configuration
-create_new_vpc = true
-vpc_cidr = "10.0.0.0/16"
+create_vpc = true  # Set to false to use existing VPC
+vpc_cidr   = "10.10.0.0/16"
 
-# Instance Configuration
-elasticsearch_instance_type = "t3.medium"
-logstash_instance_type = "t3.medium"
-filebeat_instance_type = "t3.small"
+# EC2 Configuration
+instance_type  = "t3.2xlarge"  # Recommended for Elasticsearch
+instance_count = 3             # Number of nodes in the Elasticsearch cluster
+public_key     = "~/.ssh/id_rsa.pub"  # Path to your SSH public key
+volume_size    = 100           # Recommended at least 100GB for Elasticsearch
 
-# Cluster Configuration
-elasticsearch_master_count = 1
-elasticsearch_data_count = 2
+# Elasticsearch Configuration
+elasticsearch_version = "8.18.0"
+cluster_name          = "elk-cluster"
+enable_ui             = true  # Set to true to install Kibana alongside Elasticsearch
 
-# SSH Key
-ssh_key_name = "elk-stack-key"
+# Logstash Configuration
+logstash_instance_type = "t3.xlarge"
+
+# Filebeat Configuration
+filebeat_instance_type = "t2.micro"
+
+# Environment
+environment = "dev"
+
+# S3 Backup Configuration
+es_use_s3_backups = true
 ```
 
 ### 2. Initialize and Apply
@@ -99,14 +110,15 @@ This will create an inventory file at `../ansible/inventory/elk.ini` for use wit
 
 ### VPC Options
 
-- **Create New VPC**: Set `create_new_vpc = true` to create a new VPC
-- **Use Existing VPC**: Set `create_new_vpc = false` and provide `vpc_id` and subnet IDs
+- **Create New VPC**: Set `create_vpc = true` to create a new VPC
+- **Use Existing VPC**: Set `create_vpc = false` and provide `vpc_id` and subnet IDs
 
 ### Elasticsearch Cluster Configuration
 
-- `elasticsearch_master_count`: Number of dedicated master nodes
-- `elasticsearch_data_count`: Number of data nodes
-- `elasticsearch_instance_type`: Instance type for Elasticsearch nodes
+- `instance_count`: Number of nodes in the Elasticsearch cluster
+- `instance_type`: Instance type for Elasticsearch nodes
+- `elasticsearch_version`: Version of Elasticsearch to deploy
+- `cluster_name`: Name of the Elasticsearch cluster
 
 ### S3 Backup Configuration
 
@@ -188,7 +200,7 @@ For larger Elasticsearch clusters or production environments, consider:
 
 1. Adjusting instance types in `terraform.tfvars`:
    ```hcl
-   elasticsearch_instance_type = "r5.xlarge"
+   instance_type = "r5.xlarge"
    ```
 
 2. Enabling advanced monitoring:
@@ -198,6 +210,6 @@ For larger Elasticsearch clusters or production environments, consider:
 
 3. Using dedicated EBS volumes for data:
    ```hcl
-   elasticsearch_data_volume_size = 100
-   elasticsearch_data_volume_type = "gp3"
+   volume_size = 200
+   volume_type = "gp3"
    ```
