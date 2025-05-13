@@ -54,7 +54,6 @@ Before beginning deployment, ensure you have:
 3. **Ansible**: Version 2.9 or higher installed
 4. **SSH Key Pair**: For accessing the instances
 5. **AWS CLI** (optional): Configured with valid credentials
-6. **jq**: For JSON parsing in scripts
 
 ## Deployment Options
 
@@ -101,6 +100,9 @@ This script will:
 Examples:
 
 ```bash
+# Deploy all (Terraform + Ansible)
+./deploy-elk-stack.sh
+
 # Deploy only Elasticsearch and Kibana components
 ./deploy-elk-stack.sh -t elasticsearch,kibana
 
@@ -205,14 +207,7 @@ curl -X POST "http://localhost:9200/_snapshot/s3_repository/snapshot_name/_resto
 To modify the backup configuration (schedule, retention, etc.):
 
 1. Edit `/d/repos/nova-iris/elk-stack-setup/ansible/roles/elasticsearch_s3_backup/defaults/main.yml` 
-2. Re-run the deployment script with the Ansible-only option:
-   ```bash
-   ./deploy-elk-stack.sh -a
-   ```
-
-### Running Only S3 Backup Configuration
-
-If you want to run only the S3 backup configuration without deploying other components:
+2. Running Only S3 Backup Configuration
 
 #### Option 1: Using Tag with install-elk.yml
 
@@ -221,14 +216,7 @@ cd /d/repos/nova-iris/elk-stack-setup/ansible
 ansible-playbook install-elk.yml -t s3_backup
 ```
 
-#### Option 2: Using Dedicated S3 Backup Playbook
-
-```bash
-cd /d/repos/nova-iris/elk-stack-setup/ansible
-ansible-playbook s3-backup.yml
-```
-
-#### Option 3: Using deploy-elk-stack.sh with Tag
+#### Option 2: Using deploy-elk-stack.sh with Tag
 
 ```bash
 cd /d/repos/nova-iris/elk-stack-setup
@@ -267,11 +255,3 @@ For detailed logs:
 export TF_LOG=DEBUG
 terraform apply -auto-approve
 ```
-
-## Contributing
-
-When contributing to this project:
-
-1. Create a new branch for your changes
-2. Test thoroughly before merging
-3. Update documentation with any new features or important information

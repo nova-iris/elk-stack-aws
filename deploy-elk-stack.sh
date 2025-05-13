@@ -121,14 +121,6 @@ check_prerequisites() {
             log_info "Found $TERRAFORM_VERSION"
         fi
         
-        # Check if jq is installed (required for parsing terraform output)
-        if ! command -v jq &> /dev/null; then
-            log_error "jq is not installed. Please install jq and try again."
-            exit 1
-        else
-            log_info "Found jq for JSON parsing"
-        fi
-        
         # Check if AWS CLI is installed
         if ! command -v aws &> /dev/null; then
             log_error "AWS CLI is not installed. It's required for AWS credential validation."
