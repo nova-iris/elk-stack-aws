@@ -10,7 +10,6 @@ module "elasticsearch_backup" {
 
   # Lifecycle configuration
   enable_lifecycle           = var.es_backup_enable_lifecycle
-  backup_prefix              = var.es_backup_prefix
   transition_to_ia_days      = var.es_backup_transition_to_ia_days
   transition_to_glacier_days = var.es_backup_transition_to_glacier_days
   expiration_days            = var.es_backup_expiration_days

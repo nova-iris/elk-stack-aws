@@ -7,6 +7,7 @@
 # Terraform for infrastructure and Ansible for configuration
 # Usage: ./deploy-elk-stack.sh [-t tag1,tag2] [-a] [-h]
 #   -t: Component tags to deploy (elasticsearch,kibana,logstash,filebeat)
+#       Note: Using -t automatically enables Ansible-only mode
 #   -a: Run only Ansible configuration (skip Terraform)
 #   -h: Show help message
 # =========================================================
@@ -35,6 +36,7 @@ while getopts "t:ah" opt; do
   case $opt in
     t)
       COMPONENT_TAGS="$OPTARG"
+      ANSIBLE_ONLY=true  # Set Ansible-only mode when tags are specified
       ;;
     a)
       ANSIBLE_ONLY=true
@@ -53,6 +55,7 @@ done
 if [ "$SHOW_HELP" = true ]; then
     echo "Usage: ./deploy-elk-stack.sh [-t tag1,tag2] [-a] [-h]"
     echo "  -t: Component tags to deploy (elasticsearch,kibana,logstash,filebeat)"
+    echo "      Note: Using -t automatically enables Ansible-only mode"
     echo "  -a: Run only Ansible configuration (skip Terraform)"
     echo "  -h: Show this help message"
     exit 0
@@ -84,14 +87,14 @@ validate_tags() {
         # Check each tag is valid
         IFS=',' read -ra TAGS <<< "$COMPONENT_TAGS"
         for tag in "${TAGS[@]}"; do
-            if [[ ! "$tag" =~ ^(elasticsearch|kibana|logstash|filebeat)$ ]]; then
+            if [[ ! "$tag" =~ ^(elasticsearch|s3_backup|kibana|logstash|filebeat)$ ]]; then
                 log_error "Invalid component tag: $tag"
                 VALID_TAGS=false
             fi
         done
         
         if [ "$VALID_TAGS" = false ]; then
-            log_error "Valid component tags are: elasticsearch, kibana, logstash, filebeat"
+            log_error "Valid component tags are: elasticsearch, s3_backup, kibana, logstash, filebeat"
             exit 1
         fi
     fi
@@ -329,6 +332,18 @@ display_access_info() {
         return 1
     fi
     
+    # Retrieve the password from the Elasticsearch master node
+    log_info "Retrieving Elasticsearch credentials..."
+    ES_PASSWORD=$(ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new ubuntu@$ES_MASTER_IP -i ~/.ssh/id_ed25519 'sudo cat /etc/elasticsearch/elastic_credentials.txt' 2>/dev/null)
+    
+    # Handle password retrieval errors
+    if [ $? -ne 0 ] || [ -z "$ES_PASSWORD" ]; then
+        log_warning "Could not automatically retrieve the Elasticsearch password."
+        PASSWORD_MSG="Password retrieval failed. Check manually on the Elasticsearch master node."
+    else
+        PASSWORD_MSG=$ES_PASSWORD
+    fi
+    
     # Display access information
     echo -e "\n${BLUE}=================================================${NC}"
     echo -e "${BLUE}           ELK STACK ACCESS INFORMATION           ${NC}"
@@ -336,11 +351,13 @@ display_access_info() {
     echo -e "${GREEN}Elasticsearch endpoint:${NC} https://$ES_MASTER_IP:9200"
     echo -e "${GREEN}Kibana URL:${NC} http://$ES_MASTER_IP:5601"
     echo -e "${GREEN}Default username:${NC} elastic"
-    echo -e "${YELLOW}Password:${NC} Check on the Elasticsearch master node at /etc/elasticsearch/elastic_credentials.txt"
+    echo -e "${YELLOW}Password:${NC} ${PASSWORD_MSG}"
     echo -e "${BLUE}=================================================${NC}\n"
     
-    echo "To retrieve the elastic user password, run:"
-    echo -e "${YELLOW}ssh ubuntu@$ES_MASTER_IP -i ~/.ssh/id_ed25519 'sudo cat /etc/elasticsearch/elastic_credentials.txt'${NC}\n"
+    if [ $? -ne 0 ] || [ -z "$ES_PASSWORD" ]; then
+        echo "To retrieve the elastic user password manually, run:"
+        echo -e "${YELLOW}ssh ubuntu@$ES_MASTER_IP -i ~/.ssh/id_ed25519 'sudo cat /etc/elasticsearch/elastic_credentials.txt'${NC}\n"
+    fi
     
     cd "${SCRIPT_DIR}"
 }

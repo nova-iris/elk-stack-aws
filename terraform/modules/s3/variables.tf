@@ -27,12 +27,6 @@ variable "enable_lifecycle" {
   default     = true
 }
 
-variable "backup_prefix" {
-  description = "Prefix for backup objects in the bucket"
-  type        = string
-  default     = "es-backup/"
-}
-
 variable "transition_to_ia_days" {
   description = "Number of days after which to transition objects to Standard-IA storage class"
   type        = number

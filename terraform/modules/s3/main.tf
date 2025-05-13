@@ -1,13 +1,3 @@
-terraform {
-  required_version = ">= 1.0.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
 # S3 bucket for Elasticsearch backups
 resource "aws_s3_bucket" "es_backup" {
   bucket        = var.bucket_name
@@ -70,10 +60,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "es_backup" {
   rule {
     id     = "backup-expiration"
     status = "Enabled"
-
-    filter {
-      prefix = var.backup_prefix
-    }
 
     # Transition to Infrequent Access after 30 days (if enabled)
     dynamic "transition" {

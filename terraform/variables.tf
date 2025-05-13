@@ -176,12 +176,6 @@ variable "es_backup_enable_lifecycle" {
   default     = true
 }
 
-variable "es_backup_prefix" {
-  description = "Prefix for backup objects in the bucket"
-  type        = string
-  default     = "elasticsearch/"
-}
-
 variable "es_backup_transition_to_ia_days" {
   description = "Number of days after which to transition backup objects to Standard-IA storage class"
   type        = number
