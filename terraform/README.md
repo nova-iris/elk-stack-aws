@@ -2,18 +2,6 @@
 
 This directory contains the Terraform configurations for deploying ELK Stack infrastructure in AWS. These configurations focus on creating the necessary cloud infrastructure components, which are then configured by Ansible playbooks in a separate step.
 
-## Architecture Diagram
-
-![ELK Stack Architecture Diagram](../ELK_Diagram.png)
-
-The diagram illustrates the AWS infrastructure that Terraform provisions:
-
-- EC2 instances for Elasticsearch (master and data nodes), Kibana, Logstash, and Filebeat
-- VPC with public and private subnets
-- Security groups for controlling network access
-- IAM roles and policies for S3 backup access
-- S3 bucket for Elasticsearch snapshots
-
 ## Terraform Files Overview
 
 ```

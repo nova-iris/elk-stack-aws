@@ -248,10 +248,3 @@ Common issues:
 2. **Elasticsearch Cluster Formation**: Check network settings and discovery configuration
 3. **Ansible Errors**: Verify the inventory file was properly generated
 4. **AWS Resource Limits**: Ensure your account has sufficient capacity
-
-For detailed logs:
-
-```bash
-export TF_LOG=DEBUG
-terraform apply -auto-approve
-```

@@ -2,10 +2,6 @@
 
 This directory contains Ansible playbooks and roles for configuring the Elastic Stack components on AWS EC2 instances.
 
-## Architecture Diagram
-
-![ELK Stack Architecture Diagram](../ELK_Diagram.png)
-
 ## Directory Structure
 
 ```
