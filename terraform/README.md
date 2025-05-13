@@ -9,6 +9,22 @@ This directory contains Terraform configurations to deploy a complete Elastic St
 - Security groups with proper port configurations
 - Automatic generation of Ansible inventory for configuration management
 
+## Architecture Diagram
+
+Below is the architecture diagram of the ELK Stack deployment in AWS:
+
+![ELK Stack Architecture Diagram](../ELK_Diagram.png)
+
+The diagram illustrates the AWS infrastructure that Terraform provisions for the ELK Stack:
+
+- EC2 instances for each component of the stack
+- VPC with public and private subnets
+- Security groups for controlling network access
+- IAM roles and policies for S3 backup access
+- S3 bucket for Elasticsearch snapshots
+
+This Terraform configuration creates all the necessary infrastructure components shown in the diagram, which are then configured by the Ansible playbooks.
+
 ## Prerequisites
 
 Before you begin, ensure you have:

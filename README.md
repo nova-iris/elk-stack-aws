@@ -11,6 +11,24 @@ The deployed ELK Stack consists of:
 - **Kibana**: Data visualization dashboard for Elasticsearch
 - **Filebeat**: Lightweight log shipper for forwarding logs
 
+### Architecture Diagram
+
+Below is the architecture diagram of the ELK Stack deployment in AWS:
+
+![ELK Stack Architecture Diagram](./ELK_Diagram.png)
+
+The diagram illustrates how the different components of the ELK Stack are deployed across AWS EC2 instances within a VPC. The architecture includes:
+
+- Elasticsearch cluster with dedicated master and data nodes for scalability and resilience
+- Logstash instances for processing and transforming data
+- Kibana server for data visualization and management
+- Filebeat instances for collecting and forwarding log files
+- S3 bucket for Elasticsearch snapshots and backups
+- Appropriate security groups controlling access between components
+- Network configuration with public and private subnets
+
+This architecture provides a scalable and resilient logging and analytics infrastructure, with automated backup capabilities to S3.
+
 ## Directory Structure
 
 ```

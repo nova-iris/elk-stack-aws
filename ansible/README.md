@@ -7,6 +7,22 @@ This directory contains Ansible playbooks and roles for deploying and configurin
 - **Kibana**: Data visualization dashboard
 - **Filebeat**: Lightweight log shipper
 
+## Architecture Diagram
+
+The ELK Stack is deployed with the following architecture in AWS:
+
+![ELK Stack Architecture Diagram](../ELK_Diagram.png)
+
+This architecture diagram illustrates the deployment of Elasticsearch, Logstash, Kibana, and Filebeat across EC2 instances in AWS. The configuration includes:
+
+- Master and data nodes for Elasticsearch to provide scalability and resilience
+- Logstash for data ingestion and transformation
+- Kibana for visualization and analytics interface
+- Filebeat for log collection and forwarding
+- S3-based snapshot repository for backup and recovery
+
+The Ansible playbooks in this directory automate the configuration of all these components according to the architecture shown in the diagram.
+
 ## Directory Structure
 
 ```
